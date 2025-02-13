@@ -102,10 +102,11 @@
             settings = {
               excludes = [
                 "*.lock"
+                ".direnv/*"
                 ".envrc"
                 ".gitignore"
-                "target/*"
                 "result*/"
+                "target/*"
               ];
             };
           }).config.build.wrapper;
