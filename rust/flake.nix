@@ -27,13 +27,21 @@
 
           nativeBuildInputs = with pkgs; [ pkg-config ];
           buildInputs = with pkgs; [ ] ++ lib.optionals stdenv.isDarwin [ libiconv ];
-
-          # CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        rust_template = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+        rust_template = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+
+            env = {
+              CARGO_PROFILE = "mega";
+              CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+            };
+          }
+        );
 
         hack =
           {
