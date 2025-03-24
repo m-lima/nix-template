@@ -6,5 +6,9 @@
         path = ./rust;
       };
     };
+
+    lib = {
+      rust.helper = import ./helper/rust;
+    };
   };
 }

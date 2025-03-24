@@ -6,14 +6,19 @@
   ...
 }:
 {
-  commonEnv ? (x: x),
+  common ? {},
+  main ? {},
+  hackSkip ? [ "default" ]
 }:
+name:
 flake-utils.lib.eachDefaultSystem (
   system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib stdenv;
     craneLib = crane.mkLib pkgs;
+
+    prepareSkip = list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep " " list;
 
     common = {
       env = { };
@@ -27,8 +32,6 @@ flake-utils.lib.eachDefaultSystem (
       nativeBuildInputs = [ ];
       buildInputs = [ ];
     };
-
-    hackSkip = "--skip default";
 
     commonArgs = {
       env = common.env;
@@ -52,7 +55,7 @@ flake-utils.lib.eachDefaultSystem (
       env =
         commonArgs.env
         // {
-
+          # Assumes that the template was used and that .cargo/config.toml is present
           CARGO_PROFILE = "mega";
           CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
         }
@@ -83,7 +86,7 @@ flake-utils.lib.eachDefaultSystem (
             // {
               inherit commonArtifacts;
               pnameSuffix = "-hack";
-              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace ${args} ${hackSkip}";
+              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace " + prepareSkip hackSkip + args;
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-hack ] ++ tools;
             }
           );
@@ -101,15 +104,15 @@ flake-utils.lib.eachDefaultSystem (
           args = "check --examples";
         };
         hackClippy = hack {
-          args = "clippy";
+          args = "clippy -- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackClippyTests = hack {
-          args = "clippy --tests";
+          args = "clippy --tests -- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackClippyExamples = hack {
-          args = "clippy --examples";
+          args = "clippy --examples -- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackTest = hack {
@@ -120,8 +123,12 @@ flake-utils.lib.eachDefaultSystem (
   {
     checks = checks;
 
-    packages.default = rust_template;
+    packages = {
+      default = rust_template;
+      ${name} = rust_template;
+    };
 
+    # TODO: If app
     apps.default = flake-utils.lib.mkApp {
       drv = rust_template;
     };
@@ -134,7 +141,7 @@ flake-utils.lib.eachDefaultSystem (
           #!/usr/bin/env bash
           shift
 
-          skip="${hackSkip}"
+          skip="${prepareSkip hackSkip}"
 
           while (( $# > 0 )); do
             case "$1" in
