@@ -3,12 +3,12 @@
     templates = {
       rust = {
         description = "Rust scaffold";
-        path = ./rust;
+        path = ./template/rust;
       };
     };
 
     lib = {
-      rust.helper = import ./helper/rust;
+      rust.helper = import ./lib/rust/helper.nix;
     };
   };
 }
