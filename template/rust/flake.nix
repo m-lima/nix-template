@@ -17,5 +17,5 @@
       rust-helper,
       ...
     }@inputs:
-    rust-helper.lib.rust.helper inputs "template";
+    rust-helper.lib.rust.helper inputs { } ./. "rust_template";
 }
