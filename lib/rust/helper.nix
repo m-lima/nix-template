@@ -36,11 +36,12 @@ flake-utils.lib.eachDefaultSystem (
         in
         lib.fileset.toSource {
           inherit root;
-          fileset =
-            lib.fileset.unions [
+          fileset = lib.fileset.unions (
+            [
               (craneLib.fileset.commonCargoSources root)
             ]
-            ++ allowFilesets;
+            ++ allowFilesets
+          );
         };
     };
 
