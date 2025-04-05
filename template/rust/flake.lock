@@ -60,11 +60,11 @@
     },
     "rust-helper": {
       "locked": {
-        "lastModified": 1743859628,
-        "narHash": "sha256-g1O2qW/Ftkvc2xWyKxH73qehNSdWnHUBmTrgtV7NPmM=",
+        "lastModified": 1743876565,
+        "narHash": "sha256-mLjjcyxaRm0fxkYb6EbqJCdRJ34RUa1ZbhXxvaI/t0k=",
         "owner": "m-lima",
         "repo": "nix-template",
-        "rev": "f76544fd7986c2896cc65ef4b899f3d94a61a8f8",
+        "rev": "4321902908a6f36d9580bf165ffe3f8e273c01ac",
         "type": "github"
       },
       "original": {
