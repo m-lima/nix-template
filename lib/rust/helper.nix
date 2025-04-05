@@ -6,9 +6,14 @@
   ...
 }:
 {
-  common ? {},
-  main ? {},
-  hackSkip ? [ "default" ]
+  commonEnv ? { },
+  commonNativeBuildInputs ? [ ],
+  commonBuildInputs ? [ ],
+  mainEnv ? { },
+  mainNativeBuildInputs ? [ ],
+  mainBuildInputs ? [ ],
+  allowFilesets ? [ ],
+  hackSkip ? [ "default" ],
 }:
 name:
 flake-utils.lib.eachDefaultSystem (
@@ -18,25 +23,13 @@ flake-utils.lib.eachDefaultSystem (
     inherit (pkgs) lib stdenv;
     craneLib = crane.mkLib pkgs;
 
-    prepareSkip = list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep " " list;
-
-    common = {
-      env = { };
-      nativeBuildInputs = [ ];
-      buildInputs = [ ];
-      allowFilesets = [ ];
-    };
-
-    main = {
-      env = { };
-      nativeBuildInputs = [ ];
-      buildInputs = [ ];
-    };
+    prepareSkip =
+      list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep "," list;
 
     commonArgs = {
-      env = common.env;
-      nativeBuildInputs = common.nativeBuildInputs;
-      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ common.buildInputs;
+      env = commonEnv;
+      nativeBuildInputs = commonNativeBuildInputs;
+      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs;
       src =
         let
           root = ./.;
@@ -47,7 +40,7 @@ flake-utils.lib.eachDefaultSystem (
             lib.fileset.unions [
               (craneLib.fileset.commonCargoSources root)
             ]
-            ++ common.allowFilesets;
+            ++ allowFilesets;
         };
     };
 
@@ -59,14 +52,14 @@ flake-utils.lib.eachDefaultSystem (
           CARGO_PROFILE = "mega";
           CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
         }
-        // main.env;
-      nativeBuildInputs = commonArgs.nativeBuildInputs ++ main.nativeBuildInputs;
-      buildInputs = commonArgs.buildInputs ++ main.buildInputs;
+        // mainEnv;
+      nativeBuildInputs = commonArgs.nativeBuildInputs ++ mainNativeBuildInputs;
+      buildInputs = commonArgs.buildInputs ++ mainBuildInputs;
     };
 
     commonArtifacts = craneLib.buildDepsOnly commonArgs;
 
-    rust_template = craneLib.buildPackage (
+    mainArtifact = craneLib.buildPackage (
       commonArgs
       // mainArgs
       // {
@@ -92,7 +85,7 @@ flake-utils.lib.eachDefaultSystem (
           );
       in
       {
-        inherit rust_template;
+        inherit mainArtifact;
 
         hackCheck = hack {
           args = "check";
@@ -123,15 +116,9 @@ flake-utils.lib.eachDefaultSystem (
   {
     checks = checks;
 
-    packages = {
-      default = rust_template;
-      ${name} = rust_template;
-    };
+    packages.default = mainArtifact;
 
-    # TODO: If app
-    apps.default = flake-utils.lib.mkApp {
-      drv = rust_template;
-    };
+    apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
 
     devShells.default = craneLib.devShell {
       checks = checks.${system};
@@ -145,8 +132,6 @@ flake-utils.lib.eachDefaultSystem (
 
           while (( $# > 0 )); do
             case "$1" in
-              nightly)
-                nightly='+nightly' ;;
               run|r)
                 run=1 ;;
               clean|c)
@@ -164,24 +149,24 @@ flake-utils.lib.eachDefaultSystem (
             cargo clean
           fi && \
           echo "[34mFormatting[m" && \
-          cargo $nightly fmt --all && \
+          cargo fmt --all && \
           echo "[34mChecking main[m" && \
-          cargo $nightly hack --feature-powerset ${skip} check --workspace $@ && \
+          cargo hack --feature-powerset ${skip} check --workspace $@ && \
           echo "[34mChecking examples[m" && \
-          cargo $nightly hack --feature-powerset ${skip} check --workspace --examples $@ && \
+          cargo hack --feature-powerset ${skip} check --workspace --examples $@ && \
           echo "[34mChecking tests[m" && \
-          cargo $nightly hack --feature-powerset ${skip} check --workspace --tests $@ && \
+          cargo hack --feature-powerset ${skip} check --workspace --tests $@ && \
           echo "[34mLinting main[m" && \
-          cargo $nightly hack --feature-powerset ${skip} clippy --workspace $@ && \
+          cargo hack --feature-powerset ${skip} clippy --workspace $@ && \
           echo "[34mLinting tests[m" && \
-          cargo $nightly hack --feature-powerset ${skip} clippy --workspace --tests $@ && \
+          cargo hack --feature-powerset ${skip} clippy --workspace --tests $@ && \
           echo "[34mLinting examples[m" && \
-          cargo $nightly hack --feature-powerset ${skip} clippy --workspace --examples $@ && \
+          cargo hack --feature-powerset ${skip} clippy --workspace --examples $@ && \
           echo "[34mTesting main[m" && \
-          cargo $nightly hack --feature-powerset ${skip} test --workspace $@ && \
+          cargo hack --feature-powerset ${skip} test --workspace $@ && \
           if [ "$run" ]; then
             echo "[34mRunning[m" && \
-            cargo $nightly run $@
+            cargo run $@
           fi
         '')
       ];
