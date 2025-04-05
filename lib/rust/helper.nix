@@ -24,7 +24,7 @@ flake-utils.lib.eachDefaultSystem (
     craneLib = crane.mkLib pkgs;
 
     prepareSkip =
-      list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep "," list + " ";
+      list: lib.optionalString (lib.length list > 0) "--skip  ${lib.concatStringsSep "," list}";
 
     commonArgs = {
       env = commonEnv;
@@ -76,7 +76,7 @@ flake-utils.lib.eachDefaultSystem (
             // {
               cargoArtifacts = commonArtifacts;
               pnameSuffix = "-hack";
-              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace " + prepareSkip hackSkip + args;
+              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace ${prepareSkip hackSkip} ${args}";
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-hack ] ++ tools;
             }
           );
