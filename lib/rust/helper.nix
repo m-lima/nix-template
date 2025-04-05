@@ -13,9 +13,9 @@
   mainNativeBuildInputs ? [ ],
   mainBuildInputs ? [ ],
   allowFilesets ? [ ],
-  hackSkip ? [ "default" ],
+  hackSkip ? [ ],
 }:
-name:
+root: name:
 flake-utils.lib.eachDefaultSystem (
   system:
   let
@@ -24,25 +24,21 @@ flake-utils.lib.eachDefaultSystem (
     craneLib = crane.mkLib pkgs;
 
     prepareSkip =
-      list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep "," list;
+      list: lib.optionalString (lib.length list > 0) " --skip " + lib.concatStringsSep "," list + " ";
 
     commonArgs = {
       env = commonEnv;
       nativeBuildInputs = commonNativeBuildInputs;
       buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs;
-      src =
-        let
-          root = ./.;
-        in
-        lib.fileset.toSource {
-          inherit root;
-          fileset = lib.fileset.unions (
-            [
-              (craneLib.fileset.commonCargoSources root)
-            ]
-            ++ allowFilesets
-          );
-        };
+      src = lib.fileset.toSource {
+        inherit root;
+        fileset = lib.fileset.unions (
+          [
+            (craneLib.fileset.commonCargoSources root)
+          ]
+          ++ allowFilesets
+        );
+      };
     };
 
     mainArgs = {
@@ -64,7 +60,7 @@ flake-utils.lib.eachDefaultSystem (
       commonArgs
       // mainArgs
       // {
-        inherit commonArtifacts;
+        cargoArtifacts = commonArtifacts;
       }
     );
 
@@ -78,7 +74,7 @@ flake-utils.lib.eachDefaultSystem (
           craneLib.mkCargoDerivation (
             commonArgs
             // {
-              inherit commonArtifacts;
+              cargoArtifacts = commonArtifacts;
               pnameSuffix = "-hack";
               buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace " + prepareSkip hackSkip + args;
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-hack ] ++ tools;
@@ -86,7 +82,7 @@ flake-utils.lib.eachDefaultSystem (
           );
       in
       {
-        inherit mainArtifact;
+        ${name} = mainArtifact;
 
         hackCheck = hack {
           args = "check";
@@ -122,7 +118,7 @@ flake-utils.lib.eachDefaultSystem (
     apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
 
     devShells.default = craneLib.devShell {
-      checks = checks.${system};
+      inherit checks;
       packages = with pkgs; [
         cargo-hack
         (pkgs.writeShellScriptBin "cargo-all" ''
@@ -139,7 +135,7 @@ flake-utils.lib.eachDefaultSystem (
                 clean=1 ;;
               skip|s)
                 shift
-                skip="--skip ${1}"
+                skip="--skip $1"
                 ;;
             esac
             shift
@@ -152,19 +148,19 @@ flake-utils.lib.eachDefaultSystem (
           echo "[34mFormatting[m" && \
           cargo fmt --all && \
           echo "[34mChecking main[m" && \
-          cargo hack --feature-powerset ${skip} check --workspace $@ && \
+          cargo hack --feature-powerset $skip check --workspace $@ && \
           echo "[34mChecking examples[m" && \
-          cargo hack --feature-powerset ${skip} check --workspace --examples $@ && \
+          cargo hack --feature-powerset $skip check --workspace --examples $@ && \
           echo "[34mChecking tests[m" && \
-          cargo hack --feature-powerset ${skip} check --workspace --tests $@ && \
+          cargo hack --feature-powerset $skip check --workspace --tests $@ && \
           echo "[34mLinting main[m" && \
-          cargo hack --feature-powerset ${skip} clippy --workspace $@ && \
+          cargo hack --feature-powerset $skip clippy --workspace $@ && \
           echo "[34mLinting tests[m" && \
-          cargo hack --feature-powerset ${skip} clippy --workspace --tests $@ && \
+          cargo hack --feature-powerset $skip clippy --workspace --tests $@ && \
           echo "[34mLinting examples[m" && \
-          cargo hack --feature-powerset ${skip} clippy --workspace --examples $@ && \
+          cargo hack --feature-powerset $skip clippy --workspace --examples $@ && \
           echo "[34mTesting main[m" && \
-          cargo hack --feature-powerset ${skip} test --workspace $@ && \
+          cargo hack --feature-powerset $skip test --workspace $@ && \
           if [ "$run" ]; then
             echo "[34mRunning[m" && \
             cargo run $@
