@@ -138,6 +138,8 @@ flake-utils.lib.eachDefaultSystem (
 
           while (( $# > 0 )); do
             case "$1" in
+              nightly)
+                nightly='+nightly' ;;
               run|r)
                 run=1 ;;
               clean|c)
@@ -155,24 +157,24 @@ flake-utils.lib.eachDefaultSystem (
             cargo clean
           fi && \
           echo "[34mFormatting[m" && \
-          cargo fmt --all && \
+          cargo $nightly fmt --all && \
           echo "[34mChecking main[m" && \
-          cargo hack --feature-powerset $skip check --workspace $@ && \
+          cargo $nightly hack --feature-powerset $skip check --workspace $@ && \
           echo "[34mChecking examples[m" && \
-          cargo hack --feature-powerset $skip check --workspace --examples $@ && \
+          cargo $nightly hack --feature-powerset $skip check --workspace --examples $@ && \
           echo "[34mChecking tests[m" && \
-          cargo hack --feature-powerset $skip check --workspace --tests $@ && \
+          cargo $nightly hack --feature-powerset $skip check --workspace --tests $@ && \
           echo "[34mLinting main[m" && \
-          cargo hack --feature-powerset $skip clippy --workspace $@ && \
+          cargo $nightly hack --feature-powerset $skip clippy --workspace $@ && \
           echo "[34mLinting tests[m" && \
-          cargo hack --feature-powerset $skip clippy --workspace --tests $@ && \
+          cargo $nightly hack --feature-powerset $skip clippy --workspace --tests $@ && \
           echo "[34mLinting examples[m" && \
-          cargo hack --feature-powerset $skip clippy --workspace --examples $@ && \
+          cargo $nightly hack --feature-powerset $skip clippy --workspace --examples $@ && \
           echo "[34mTesting main[m" && \
-          cargo hack --feature-powerset $skip test --workspace $@ && \
+          cargo $nightly hack --feature-powerset $skip test --workspace $@ && \
           if [ "$run" ]; then
             echo "[34mRunning[m" && \
-            cargo run $@
+            cargo $nightly run $@
           fi
         '')
       ];
