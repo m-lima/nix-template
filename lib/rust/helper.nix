@@ -1,4 +1,5 @@
 {
+  self,
   nixpkgs,
   crane,
   flake-utils,
@@ -64,10 +65,41 @@ flake-utils.lib.eachDefaultSystem (
       }
     );
 
+    treefmt =
+      (treefmt-nix.lib.evalModule pkgs {
+        projectRootFile = "Cargo.toml";
+        programs =
+          {
+            nixfmt.enable = true;
+            rustfmt = {
+              enable = true;
+              edition = "2024";
+            };
+            taplo.enable = true;
+          }
+          // (lib.listToAttrs (
+            map (x: {
+              name = x;
+              value = {
+                enable = true;
+              };
+            }) fmts
+          ));
+        settings = {
+          excludes = [
+            "*.lock"
+            ".direnv/*"
+            ".envrc"
+            ".gitignore"
+            "result*/*"
+            "target/*"
+            "LICENSE"
+          ];
+        };
+      }).config.build;
+
     checks = {
-      fmt = craneLib.cargoFmt {
-        inherit (commonArgs) src;
-      };
+      formatting = treefmt.check self;
 
       clippy = craneLib.cargoClippy (
         commonArgs
@@ -114,6 +146,8 @@ flake-utils.lib.eachDefaultSystem (
     checks = checks;
 
     packages.default = mainArtifact;
+
+    formatter = treefmt.wrapper;
 
     devShells.default = craneLib.devShell {
       inherit checks;
@@ -166,36 +200,6 @@ flake-utils.lib.eachDefaultSystem (
         '')
       ];
     };
-
-    formatter =
-      (treefmt-nix.lib.evalModule pkgs {
-        projectRootFile = "Cargo.toml";
-        programs =
-          {
-            nixfmt.enable = true;
-            rustfmt.enable = true;
-            taplo.enable = true;
-          }
-          // (lib.listToAttrs (
-            map (x: {
-              name = x;
-              value = {
-                enable = true;
-              };
-            }) fmts
-          ));
-        settings = {
-          excludes = [
-            "*.lock"
-            ".direnv/*"
-            ".envrc"
-            ".gitignore"
-            "result*/*"
-            "target/*"
-            "LICENSE"
-          ];
-        };
-      }).config.build.wrapper;
   }
   // (lib.optionalAttrs binary {
     apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
