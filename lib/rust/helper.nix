@@ -7,11 +7,11 @@
 }:
 {
   commonEnv ? { },
-  commonNativeBuildInputs ? [ ],
-  commonBuildInputs ? [ ],
+  commonNativeBuildInputs ? _: [ ],
+  commonBuildInputs ? _: [ ],
   mainEnv ? { },
-  mainNativeBuildInputs ? [ ],
-  mainBuildInputs ? [ ],
+  mainNativeBuildInputs ? _: [ ],
+  mainBuildInputs ? _: [ ],
   allowFilesets ? [ ],
   hackSkip ? [ ],
 }:
@@ -28,8 +28,8 @@ flake-utils.lib.eachDefaultSystem (
 
     commonArgs = {
       env = commonEnv;
-      nativeBuildInputs = commonNativeBuildInputs;
-      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs;
+      nativeBuildInputs = commonNativeBuildInputs pkgs;
+      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs pkgs;
       src = lib.fileset.toSource {
         inherit root;
         fileset = lib.fileset.unions (
@@ -50,8 +50,8 @@ flake-utils.lib.eachDefaultSystem (
           CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
         }
         // mainEnv;
-      nativeBuildInputs = commonArgs.nativeBuildInputs ++ mainNativeBuildInputs;
-      buildInputs = commonArgs.buildInputs ++ mainBuildInputs;
+      nativeBuildInputs = commonArgs.nativeBuildInputs ++ mainNativeBuildInputs pkgs;
+      buildInputs = commonArgs.buildInputs ++ mainBuildInputs pkgs;
     };
 
     commonArtifacts = craneLib.buildDepsOnly commonArgs;
