@@ -68,15 +68,17 @@ flake-utils.lib.eachDefaultSystem (
       let
         hack =
           {
-            args,
+            cmd,
+            name ? cmd,
+            args ? "",
             tools ? [ ],
           }:
           craneLib.mkCargoDerivation (
             commonArgs
             // {
               cargoArtifacts = commonArtifacts;
-              pnameSuffix = "-hack";
-              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace ${prepareSkip hackSkip} ${args}";
+              pnameSuffix = "-hack-${cmd}";
+              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace ${prepareSkip hackSkip} ${cmd} ${args}";
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-hack ] ++ tools;
             }
           );
@@ -85,28 +87,37 @@ flake-utils.lib.eachDefaultSystem (
         ${name} = mainArtifact;
 
         hackCheck = hack {
-          args = "check";
+          cmd = "check";
         };
         hackCheckTests = hack {
-          args = "check --tests";
+          cmd = "check";
+          name = "check-tests";
+          args = "--tests";
         };
         hackCheckExamples = hack {
-          args = "check --examples";
+          cmd = "check";
+          name = "check-examples";
+          args = "--examples";
         };
         hackClippy = hack {
-          args = "clippy -- -D warnings -W clippy::pedantic";
+          cmd = "clippy";
+          args = "-- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackClippyTests = hack {
-          args = "clippy --tests -- -D warnings -W clippy::pedantic";
+          cmd = "clippy";
+          name = "clippy-tests";
+          args = "--tests -- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackClippyExamples = hack {
-          args = "clippy --examples -- -D warnings -W clippy::pedantic";
+          cmd = "clippy";
+          name = "clippy-examples";
+          args = "--examples -- -D warnings -W clippy::pedantic";
           tools = [ pkgs.clippy ];
         };
         hackTest = hack {
-          args = "test";
+          cmd = "test";
         };
       };
   in
