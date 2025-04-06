@@ -8,12 +8,13 @@
 {
   allowFilesets ? [ ],
   features ? [ ],
-  commonEnv ? { },
-  commonNativeBuildInputs ? _: [ ],
-  commonBuildInputs ? _: [ ],
-  mainEnv ? { },
-  mainNativeBuildInputs ? _: [ ],
-  mainBuildInputs ? _: [ ],
+  lockRandomSeed ? false,
+  mega ? true,
+  binary ? true,
+  fmts ? [ ],
+  buildInputs ? _: [ ],
+  nativeBuildInputs ? _: [ ],
+  args ? { },
 }:
 root: name:
 flake-utils.lib.eachDefaultSystem (
@@ -26,54 +27,52 @@ flake-utils.lib.eachDefaultSystem (
     prepareFeatures =
       list: lib.optionalString (lib.length list > 0) "--features ${lib.concatStringsSep "," list}";
 
-    commonArgs = {
-      env = commonEnv;
-      cargoExtraArgs = "--locked ${prepareFeatures features}";
-      nativeBuildInputs = commonNativeBuildInputs pkgs;
-      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs pkgs;
-      src = lib.fileset.toSource {
-        inherit root;
-        fileset = lib.fileset.unions (
-          [
-            (craneLib.fileset.commonCargoSources root)
-          ]
-          ++ allowFilesets
-        );
-      };
-    };
+    commonArgs =
+      {
+        cargoExtraArgs = "--locked ${prepareFeatures features}";
+        nativeBuildInputs = nativeBuildInputs pkgs;
+        buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ buildInputs pkgs;
+        src = lib.fileset.toSource {
+          inherit root;
+          fileset = lib.fileset.unions (
+            [
+              (craneLib.fileset.commonCargoSources root)
+            ]
+            ++ allowFilesets
+          );
+        };
+      }
+      // args
+      // (lib.optionalAttrs mega {
+        CARGO_PROFILE = "mega";
+        CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+      });
 
-    mainArgs = {
-      env =
-        commonArgs.env
-        // {
-          # Assumes that the template was used and that .cargo/config.toml is present
-          CARGO_PROFILE = "mega";
-          CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-        }
-        // mainEnv;
-      nativeBuildInputs = commonArgs.nativeBuildInputs ++ mainNativeBuildInputs pkgs;
-      buildInputs = commonArgs.buildInputs ++ mainBuildInputs pkgs;
-    };
+    mainArgs =
+      commonArgs
+      // (lib.optionalAttrs lockRandomSeed {
+        NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
+      });
 
-    commonArtifacts = craneLib.buildDepsOnly commonArgs;
+    cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
     mainArtifact = craneLib.buildPackage (
       commonArgs
       // mainArgs
       // {
-        cargoArtifacts = commonArtifacts;
+        inherit cargoArtifacts;
       }
     );
 
     checks = {
       fmt = craneLib.cargoFmt {
-        inherit (commonArtifacts) src;
+        inherit (commonArgs) src;
       };
 
       clippy = craneLib.cargoClippy (
         commonArgs
         // {
-          cargoArtifacts = commonArtifacts;
+          inherit cargoArtifacts;
           cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
         }
       );
@@ -81,7 +80,7 @@ flake-utils.lib.eachDefaultSystem (
       clippy-tests = craneLib.cargoClippy (
         commonArgs
         // {
-          cargoArtifacts = commonArtifacts;
+          inherit cargoArtifacts;
           pnameSuffix = "-clippy-tests";
           cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
         }
@@ -90,7 +89,7 @@ flake-utils.lib.eachDefaultSystem (
       clippy-examples = craneLib.cargoClippy (
         commonArgs
         // {
-          cargoArtifacts = commonArtifacts;
+          inherit cargoArtifacts;
           pnameSuffix = "-clippy-examples";
           cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
         }
@@ -99,14 +98,14 @@ flake-utils.lib.eachDefaultSystem (
       docs = craneLib.cargoDoc (
         commonArgs
         // {
-          cargoArtifacts = commonArtifacts;
+          inherit cargoArtifacts;
         }
       );
 
       tests = craneLib.cargoTest (
         commonArgs
         // {
-          cargoArtifacts = commonArtifacts;
+          inherit cargoArtifacts;
         }
       );
     };
@@ -115,8 +114,6 @@ flake-utils.lib.eachDefaultSystem (
     checks = checks;
 
     packages.default = mainArtifact;
-
-    apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
 
     devShells.default = craneLib.devShell {
       inherit checks;
@@ -173,21 +170,34 @@ flake-utils.lib.eachDefaultSystem (
     formatter =
       (treefmt-nix.lib.evalModule pkgs {
         projectRootFile = "Cargo.toml";
-        programs = {
-          nixfmt.enable = true;
-          rustfmt.enable = true;
-          taplo.enable = true;
-        };
+        programs =
+          {
+            nixfmt.enable = true;
+            rustfmt.enable = true;
+            taplo.enable = true;
+          }
+          // (lib.listToAttrs (
+            map (x: {
+              name = x;
+              value = {
+                enable = true;
+              };
+            }) fmts
+          ));
         settings = {
           excludes = [
             "*.lock"
             ".direnv/*"
             ".envrc"
             ".gitignore"
-            "result*/"
+            "result*/*"
             "target/*"
+            "LICENSE"
           ];
         };
       }).config.build.wrapper;
   }
+  // (lib.optionalAttrs binary {
+    apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
+  })
 )
