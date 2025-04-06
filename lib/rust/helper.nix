@@ -13,7 +13,6 @@
   mainNativeBuildInputs ? _: [ ],
   mainBuildInputs ? _: [ ],
   allowFilesets ? [ ],
-  hackSkip ? [ ],
 }:
 root: name:
 flake-utils.lib.eachDefaultSystem (
@@ -22,9 +21,6 @@ flake-utils.lib.eachDefaultSystem (
     pkgs = nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib stdenv;
     craneLib = crane.mkLib pkgs;
-
-    prepareSkip =
-      list: lib.optionalString (lib.length list > 0) "--skip  ${lib.concatStringsSep "," list}";
 
     commonArgs = {
       env = commonEnv;
@@ -64,60 +60,51 @@ flake-utils.lib.eachDefaultSystem (
       }
     );
 
-    checks =
-      let
-        hack =
-          {
-            cmd,
-            name ? cmd,
-            args ? "",
-            tools ? [ ],
-          }:
-          craneLib.mkCargoDerivation (
-            commonArgs
-            // {
-              cargoArtifacts = commonArtifacts;
-              pnameSuffix = "-hack-${cmd}";
-              buildPhaseCargoCommand = "cargo hack --feature-powerset --workspace ${prepareSkip hackSkip} ${cmd} ${args}";
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-hack ] ++ tools;
-            }
-          );
-      in
-      {
-        hackCheck = hack {
-          cmd = "check";
-        };
-        hackCheckTests = hack {
-          cmd = "check";
-          name = "check-tests";
-          args = "--tests";
-        };
-        hackCheckExamples = hack {
-          cmd = "check";
-          name = "check-examples";
-          args = "--examples";
-        };
-        hackClippy = hack {
-          cmd = "clippy";
-          args = "-- -D warnings -W clippy::pedantic";
-          tools = [ pkgs.clippy ];
-        };
-        hackClippyTests = hack {
-          cmd = "clippy";
-          name = "clippy-tests";
-          args = "--tests -- -D warnings -W clippy::pedantic";
-          tools = [ pkgs.clippy ];
-        };
-        hackClippyExamples = hack {
-          cmd = "clippy";
-          name = "clippy-examples";
-          args = "--examples -- -D warnings -W clippy::pedantic";
-          tools = [ pkgs.clippy ];
-        };
-        hackTest = hack {
-          cmd = "test";
-        };
+    checks = {
+      fmt = craneLib.cargoFmt {
+        inherit (commonArtifacts) src;
       };
+
+      clippy = craneLib.cargoClippy (
+        commonArgs
+        // {
+          cargoArtifacts = commonArtifacts;
+          cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
+        }
+      );
+
+      clippy-tests = craneLib.cargoClippy (
+        commonArgs
+        // {
+          cargoArtifacts = commonArtifacts;
+          pnameSuffix = "-clippy-tests";
+          cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
+        }
+      );
+
+      clippy-examples = craneLib.cargoClippy (
+        commonArgs
+        // {
+          cargoArtifacts = commonArtifacts;
+          pnameSuffix = "-clippy-examples";
+          cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
+        }
+      );
+
+      docs = craneLib.cargoDoc (
+        commonArgs
+        // {
+          cargoArtifacts = commonArtifacts;
+        }
+      );
+
+      tests = craneLib.cargoTest (
+        commonArgs
+        // {
+          cargoArtifacts = commonArtifacts;
+        }
+      );
+    };
   in
   {
     checks = checks;
@@ -133,8 +120,6 @@ flake-utils.lib.eachDefaultSystem (
         (pkgs.writeShellScriptBin "cargo-all" ''
           #!/usr/bin/env bash
           shift
-
-          skip="${prepareSkip hackSkip}"
 
           while (( $# > 0 )); do
             case "$1" in
