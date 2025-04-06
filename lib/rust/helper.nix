@@ -84,8 +84,6 @@ flake-utils.lib.eachDefaultSystem (
           );
       in
       {
-        ${name} = mainArtifact;
-
         hackCheck = hack {
           cmd = "check";
         };
