@@ -6,13 +6,14 @@
   ...
 }:
 {
+  allowFilesets ? [ ],
+  features ? [ ],
   commonEnv ? { },
   commonNativeBuildInputs ? _: [ ],
   commonBuildInputs ? _: [ ],
   mainEnv ? { },
   mainNativeBuildInputs ? _: [ ],
   mainBuildInputs ? _: [ ],
-  allowFilesets ? [ ],
 }:
 root: name:
 flake-utils.lib.eachDefaultSystem (
@@ -22,8 +23,12 @@ flake-utils.lib.eachDefaultSystem (
     inherit (pkgs) lib stdenv;
     craneLib = crane.mkLib pkgs;
 
+    prepareFeatures =
+      list: lib.optionalString (lib.length list > 0) "--features ${lib.concatStringsSep "," list}";
+
     commonArgs = {
       env = commonEnv;
+      cargoExtraArgs = "--locked ${prepareFeatures features}";
       nativeBuildInputs = commonNativeBuildInputs pkgs;
       buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ commonBuildInputs pkgs;
       src = lib.fileset.toSource {
