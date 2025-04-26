@@ -154,7 +154,6 @@ flake-utils.lib.eachDefaultSystem (
       packages = with pkgs; [
         cargo-hack
         (pkgs.writeShellScriptBin "cargo-all" ''
-          #!/usr/bin/env bash
           shift
 
           while (( $# > 0 )); do
