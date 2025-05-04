@@ -145,7 +145,13 @@ flake-utils.lib.eachDefaultSystem (
   {
     checks = checks;
 
-    packages.default = mainArtifact;
+    packages =
+      {
+        default = mainArtifact;
+      }
+      // (lib.optionalAttrs (!binary) {
+        deps = cargoArtifacts;
+      });
 
     formatter = treefmt.wrapper;
 
