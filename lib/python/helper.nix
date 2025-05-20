@@ -12,7 +12,7 @@ flake-utils.lib.eachDefaultSystem (
   system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
-    inherit (pkgs) lib stdenv;
+    inherit (pkgs) lib;
     treefmt =
       (treefmt-nix.lib.evalModule pkgs {
         projectRootFile = "flake.nix";
@@ -46,7 +46,7 @@ flake-utils.lib.eachDefaultSystem (
     formatter = treefmt.wrapper;
     devShells.default = pkgs.mkShell {
       buildInputs = [
-        pkgs.python311
+        pkgs.python312
       ] ++ buildInputs pkgs;
     };
   }
