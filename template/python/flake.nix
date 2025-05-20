@@ -1,7 +1,6 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
@@ -17,5 +16,5 @@
       helper,
       ...
     }@inputs:
-    helper.lib.rust.helper inputs { } ./. "rust_template";
+    helper.lib.python.helper inputs { };
 }
