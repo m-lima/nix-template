@@ -2,6 +2,7 @@
   self,
   nixpkgs,
   crane,
+  fenix,
   flake-utils,
   treefmt-nix,
   ...
@@ -23,7 +24,7 @@ flake-utils.lib.eachDefaultSystem (
   let
     pkgs = nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib stdenv;
-    craneLib = crane.mkLib pkgs;
+    craneLib = (crane.mkLib pkgs).overrideToolchain fenix.packages.${system}.stable.toolchain;
 
     prepareFeatures =
       list: lib.optionalString (lib.length list > 0) "--features ${lib.concatStringsSep "," list}";
