@@ -31,6 +31,7 @@ flake-utils.lib.eachDefaultSystem (
 
     commonArgs =
       {
+        strictDeps = true;
         cargoExtraArgs = "--locked ${prepareFeatures features}";
         nativeBuildInputs = nativeBuildInputs pkgs;
         buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ buildInputs pkgs;
