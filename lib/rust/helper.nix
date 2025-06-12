@@ -17,6 +17,10 @@
   buildInputs ? _: [ ],
   nativeBuildInputs ? _: [ ],
   args ? { },
+  checks ? {
+    readme = false;
+    bindgen = null;
+  },
 }:
 root: name:
 flake-utils.lib.eachDefaultSystem (
@@ -100,52 +104,73 @@ flake-utils.lib.eachDefaultSystem (
         };
       }).config.build;
 
-    checks = {
-      formatting = treefmt.check self;
+    checkSetup =
+      {
+        formatting = treefmt.check self;
 
-      clippy = craneLib.cargoClippy (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-          cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
-        }
-      );
+        clippy = craneLib.cargoClippy (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
+          }
+        );
 
-      clippy-tests = craneLib.cargoClippy (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-          pnameSuffix = "-clippy-tests";
-          cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
-        }
-      );
+        clippy-tests = craneLib.cargoClippy (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            pnameSuffix = "-clippy-tests";
+            cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
+          }
+        );
 
-      clippy-examples = craneLib.cargoClippy (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-          pnameSuffix = "-clippy-examples";
-          cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
-        }
-      );
+        clippy-examples = craneLib.cargoClippy (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            pnameSuffix = "-clippy-examples";
+            cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
+          }
+        );
 
-      docs = craneLib.cargoDoc (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-        }
-      );
+        docs = craneLib.cargoDoc (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+          }
+        );
 
-      tests = craneLib.cargoTest (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-        }
-      );
-    };
+        tests = craneLib.cargoTest (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+          }
+        );
+      }
+      // (lib.optionalAttrs (builtins.hasAttr "readme" checks && checks.readme) {
+        readme = craneLib.mkCargoDerivation (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            nativeBuildInputs = [ pkgs.cargo-readme ];
+            buildPhaseCargoCommand = "diff README.md <(cargo readme)";
+          }
+        );
+      })
+      // (lib.optionalAttrs (builtins.hasAttr "bindgen" checks && (builtins.isPath checks.bindgen)) {
+        bindgen = craneLib.mkCargoDerivation (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            nativeBuildInputs = [ pkgs.rust-cbindgen ];
+            buildPhaseCargoCommand = "diff ${checks.bindgen} <(cbindgen .)";
+          }
+        );
+      });
   in
   {
-    checks = checks;
+    checks = checkSetup;
 
     packages =
       {
@@ -158,7 +183,8 @@ flake-utils.lib.eachDefaultSystem (
     formatter = treefmt.wrapper;
 
     devShells.default = craneLib.devShell {
-      inherit checks;
+      checks = checkSetup;
+
       packages = with pkgs; [
         cargo-hack
         (pkgs.writeShellScriptBin "cargo-all" ''
