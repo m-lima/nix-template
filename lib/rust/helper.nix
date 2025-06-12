@@ -17,6 +17,7 @@
   buildInputs ? _: [ ],
   nativeBuildInputs ? _: [ ],
   args ? { },
+  buildArgs ? { },
   checks ? {
     readme = false;
     bindgen = null;
@@ -69,6 +70,7 @@ flake-utils.lib.eachDefaultSystem (
       // {
         inherit cargoArtifacts;
       }
+      // buildArgs
     );
 
     treefmt =
