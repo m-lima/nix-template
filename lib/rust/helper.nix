@@ -14,8 +14,8 @@
   mega ? true,
   binary ? true,
   fmts ? [ ],
-  buildInputs ? _: [ ],
-  nativeBuildInputs ? _: [ ],
+  buildInputs ? pkgs: [ ],
+  nativeBuildInputs ? pkgs: [ ],
   args ? { },
   buildArgs ? { },
   packages ?
@@ -76,8 +76,7 @@ flake-utils.lib.eachDefaultSystem (
     cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
     mainArtifact = craneLib.buildPackage (
-      commonArgs
-      // mainArgs
+      mainArgs
       // {
         inherit cargoArtifacts;
       }
