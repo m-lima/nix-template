@@ -18,6 +18,7 @@
   nativeBuildInputs ? pkgs: [ ],
   args ? { },
   buildArgs ? { },
+  toolchains ? fenix: [ fenix.stable.toolchain ],
   packages ?
     {
       system,
@@ -40,7 +41,12 @@ flake-utils.lib.eachDefaultSystem (
   let
     pkgs = nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib stdenv;
-    craneLib = (crane.mkLib pkgs).overrideToolchain fenix.packages.${system}.stable.toolchain;
+    craneToolchain =
+      let
+        fenixPkgs = fenix.packages.${system};
+      in
+      fenixPkgs.combine (toolchains fenixPkgs);
+    craneLib = (crane.mkLib pkgs).overrideToolchain craneToolchain;
 
     prepareFeatures =
       list: lib.optionalString (lib.length list > 0) "--features ${lib.concatStringsSep "," list}";
