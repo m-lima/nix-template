@@ -18,6 +18,17 @@
   nativeBuildInputs ? _: [ ],
   args ? { },
   buildArgs ? { },
+  packages ?
+    {
+      system,
+      pkgs,
+      lib,
+      craneLib,
+      prepareFeatures,
+      mainArgs,
+      cargoArtifacts,
+    }:
+    { },
   checks ? {
     readme = false;
     bindgen = null;
@@ -180,6 +191,17 @@ flake-utils.lib.eachDefaultSystem (
       }
       // (lib.optionalAttrs (!binary) {
         deps = cargoArtifacts;
+      })
+      // (packages {
+        inherit
+          system
+          pkgs
+          lib
+          craneLib
+          prepareFeatures
+          mainArgs
+          cargoArtifacts
+          ;
       });
 
     formatter = treefmt.wrapper;
