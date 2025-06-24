@@ -1,132 +1,104 @@
 {
-  self,
-  nixpkgs,
+  root,
+  system,
+  pkgs,
   crane,
   fenix,
-  flake-utils,
   treefmt-nix,
-  ...
 }:
-{
-  allowFilesets ? [ ],
-  features ? [ ],
-  lockRandomSeed ? false,
-  mega ? true,
-  binary ? true,
-  hack ? false,
-  fmts ? [ ],
-  buildInputs ? pkgs: [ ],
-  nativeBuildInputs ? pkgs: [ ],
-  args ? { },
-  buildArgs ? { },
-  toolchains ? fenix: [ fenix.stable.toolchain ],
-  packages ?
+let
+  stdenv = pkgs.stdenv;
+  lib = pkgs.stdenv;
+
+  listFeatures =
+    arg: list:
+    lib.optionalString (builtins.length list > 0) "${arg} ${builtins.concatStringsSep "," list}";
+
+  skipFeatures = listFeatures "--skip";
+
+  prepareFeatures = listFeatures "--features";
+
+  fenixPkgs = fenix.packages.${system};
+  overrideCraneLib = (crane.mkLib pkgs).overrideToolchain;
+
+  mkCraneLib =
     {
-      system,
-      pkgs,
-      lib,
-      craneLib,
-      prepareFeatures,
-      mainArgs,
-      cargoArtifacts,
+      toolchains ? fenixPkgs: [ ],
     }:
-    { },
-  checks ? {
-    readme = false;
-    bindgen = null;
-  },
-}:
-root: name:
-flake-utils.lib.eachDefaultSystem (
-  system:
-  let
-    pkgs = nixpkgs.legacyPackages.${system};
-    inherit (pkgs) lib stdenv;
-    craneToolchain =
-      let
-        fenixPkgs = fenix.packages.${system};
-      in
-      fenixPkgs.combine (toolchains fenixPkgs);
-    craneLib = (crane.mkLib pkgs).overrideToolchain craneToolchain;
+    overrideCraneLib (fenixPkgs.combine (toolchains fenixPkgs));
+  mkCraneLibDefault = overrideCraneLib fenixPkgs.stable.toolchain;
 
-    prepareFeatures =
-      list: lib.optionalString (lib.length list > 0) "--features ${lib.concatStringsSep "," list}";
+  mkCommonArgs =
+    {
+      craneLib ? mkCraneLibDefault,
+      features ? [ ],
+      buildInputs ? pkgs: [ ],
+      nativeBuildInputs ? pkgs: [ ],
+      allowFilesets ? [ ],
+      mega ? true,
+    }:
+    {
+      strictDeps = true;
+      cargoExtraArgs = "--locked ${prepareFeatures features}";
+      nativeBuildInputs = nativeBuildInputs pkgs;
+      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ buildInputs pkgs;
+      src = lib.fileset.toSource {
+        inherit root;
+        fileset = lib.fileset.unions (
+          [
+            (craneLib.fileset.commonCargoSources root)
+          ]
+          ++ allowFilesets
+        );
+      };
+    }
+    // (lib.optionalAttrs mega {
+      CARGO_PROFILE = "mega";
+      CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+    });
 
-    commonArgs =
-      {
-        strictDeps = true;
-        cargoExtraArgs = "--locked ${prepareFeatures features}";
-        nativeBuildInputs = nativeBuildInputs pkgs;
-        buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ buildInputs pkgs;
-        src = lib.fileset.toSource {
-          inherit root;
-          fileset = lib.fileset.unions (
-            [
-              (craneLib.fileset.commonCargoSources root)
-            ]
-            ++ allowFilesets
-          );
-        };
-      }
-      // args
-      // (lib.optionalAttrs mega {
-        CARGO_PROFILE = "mega";
-        CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-      });
+  mkMainArgs =
+    {
+      craneLib ? mkCraneLibDefault,
+      commonArgs ? mkCommonArgs { inherit craneLib; },
+      lockRandomSeed ? false,
+    }:
+    commonArgs
+    // (lib.optionalAttrs lockRandomSeed {
+      NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
+    });
 
-    mainArgs =
-      commonArgs
-      // (lib.optionalAttrs lockRandomSeed {
-        NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
-      });
+  mkCargoArtifacts =
+    {
+      craneLib ? mkCraneLibDefault,
+      commonArgs ? mkCommonArgs { inherit craneLib; },
+    }:
+    craneLib.buildDepsOnly commonArgs;
 
-    cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-    mainArtifact = craneLib.buildPackage (
+  mkMainArtifacts =
+    {
+      craneLib ? mkCraneLibDefault,
+      commonArgs ? mkCommonArgs { inherit craneLib; },
+      mainArgs ? mkMainArgs { inherit craneLib commonArgs; },
+      cargoArtifacts ? mkCargoArtifacts {
+        inherit craneLib commonArgs;
+      },
+    }:
+    craneLib.buildPackage (
       mainArgs
       // {
         inherit cargoArtifacts;
       }
-      // buildArgs
     );
 
-    treefmt =
-      (treefmt-nix.lib.evalModule pkgs {
-        projectRootFile = "Cargo.toml";
-        programs =
-          {
-            nixfmt.enable = true;
-            rustfmt = {
-              enable = true;
-              edition = "2024";
-            };
-            taplo.enable = true;
-          }
-          // (lib.listToAttrs (
-            map (x: {
-              name = x;
-              value = {
-                enable = true;
-              };
-            }) fmts
-          ));
-        settings = {
-          excludes = [
-            "*.lock"
-            ".direnv/*"
-            ".envrc"
-            ".gitignore"
-            "result*/*"
-            "target/*"
-            "LICENSE"
-          ];
-        };
-      }).config.build;
-
-    cargoAll = pkgs.writeShellScriptBin "cargo-all" ''
+  mkCargoAll =
+    {
+      skip ? [ "default" ],
+    }:
+    pkgs.writeShellScriptBin "cargo-all" ''
       shift
 
-      skip="--skip default"
+      skip="${skipFeatures skip}"
 
       while (( $# > 0 )); do
         case "$1" in
@@ -170,123 +142,203 @@ flake-utils.lib.eachDefaultSystem (
       fi
     '';
 
-    checkSetup =
+  mkTreefmtConfig =
+    {
+      programs ? default: default,
+      settings ? default: default,
+    }:
+    {
+      programs = programs {
+        nixfmt.enable = true;
+        rustfmt = {
+          enable = true;
+          edition = "2024";
+        };
+        taplo.enable = true;
+      };
+      settings = settings {
+        excludes = [
+          "*.lock"
+          ".direnv/*"
+          ".envrc"
+          ".gitignore"
+          "result*/*"
+          "target/*"
+          "LICENSE"
+        ];
+      };
+    };
+
+  mkTreefmt =
+    {
+      config ? mkTreefmtConfig { },
+    }:
+    (treefmt-nix.lib.evalModule pkgs config).config.build;
+
+  mkFormatter =
+    {
+      treefmt,
+    }:
+    treefmt.wrapper;
+
+  mkChecks =
+    {
+      outputs,
+      treefmt ? mkTreefmt { },
+      craneLib ? mkCraneLibDefault,
+      commonArgs ? mkCommonArgs { inherit craneLib; },
+      cargoArtifacts ? mkCargoArtifacts {
+        inherit craneLib commonArgs;
+      },
+      extraChecks ? { },
+      hack ? null,
+    }:
+    {
+      formatting = treefmt.check outputs;
+    }
+    // (
+      if builtins.isAttrs hack then
+        {
+          hack = craneLib.mkCargoDerivation (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              buildPhaseCargoCommand = "cargo all";
+              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+                pkgs.cargo-hack
+                hack
+              ];
+            }
+          );
+        }
+      else
+        {
+          clippy = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
+            }
+          );
+
+          clippy-tests = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              pnameSuffix = "-clippy-tests";
+              cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
+            }
+          );
+
+          clippy-examples = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              pnameSuffix = "-clippy-examples";
+              cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
+            }
+          );
+
+          docs = craneLib.cargoDoc (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+            }
+          );
+
+          tests = craneLib.cargoTest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+            }
+          );
+        }
+    )
+    // (lib.optionalAttrs (builtins.hasAttr "readme" extraChecks && extraChecks.readme) {
+      readme = craneLib.mkCargoDerivation (
+        commonArgs
+        // {
+          inherit cargoArtifacts;
+          nativeBuildInputs = [ pkgs.cargo-readme ];
+          buildPhaseCargoCommand = "diff README.md <(cargo readme)";
+        }
+      );
+    })
+    // (lib.optionalAttrs
+      (builtins.hasAttr "bindgen" extraChecks && (builtins.isPath extraChecks.bindgen))
       {
-        formatting = treefmt.check self;
-      }
-      // (
-        if hack then
-          {
-            hack = craneLib.mkCargoDerivation (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                buildPhaseCargoCommand = "cargo all";
-                nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-                  pkgs.cargo-hack
-                  cargoAll
-                ];
-              }
-            );
-          }
-        else
-          {
-            clippy = craneLib.cargoClippy (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
-              }
-            );
-
-            clippy-tests = craneLib.cargoClippy (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                pnameSuffix = "-clippy-tests";
-                cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
-              }
-            );
-
-            clippy-examples = craneLib.cargoClippy (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                pnameSuffix = "-clippy-examples";
-                cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
-              }
-            );
-
-            docs = craneLib.cargoDoc (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-              }
-            );
-
-            tests = craneLib.cargoTest (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-              }
-            );
-          }
-      )
-      // (lib.optionalAttrs (builtins.hasAttr "readme" checks && checks.readme) {
-        readme = craneLib.mkCargoDerivation (
-          commonArgs
-          // {
-            inherit cargoArtifacts;
-            nativeBuildInputs = [ pkgs.cargo-readme ];
-            buildPhaseCargoCommand = "diff README.md <(cargo readme)";
-          }
-        );
-      })
-      // (lib.optionalAttrs (builtins.hasAttr "bindgen" checks && (builtins.isPath checks.bindgen)) {
         bindgen = craneLib.mkCargoDerivation (
           commonArgs
           // {
             inherit cargoArtifacts;
             nativeBuildInputs = [ pkgs.rust-cbindgen ];
-            buildPhaseCargoCommand = "diff ${checks.bindgen} <(cbindgen .)";
+            buildPhaseCargoCommand = "diff ${extraChecks.bindgen} <(cbindgen .)";
           }
         );
-      });
-  in
-  {
-    checks = checkSetup;
-
-    packages =
-      {
-        default = mainArtifact;
       }
-      // (lib.optionalAttrs (!binary) {
-        deps = cargoArtifacts;
-      })
-      // (packages {
-        inherit
-          system
-          pkgs
-          lib
-          craneLib
-          prepareFeatures
-          mainArgs
-          cargoArtifacts
-          ;
-      });
+    );
 
-    formatter = treefmt.wrapper;
+  mkDevShells =
+    {
+      checks ? mkChecks,
+      craneLib ? mkCraneLibDefault,
+      cargoAll ? mkCargoAll { },
+    }:
+    {
+      default = craneLib.devShell {
+        checks = checks;
 
-    devShells.default = craneLib.devShell {
-      checks = checkSetup;
-
-      packages = with pkgs; [
-        cargo-hack
-        cargoAll
-      ];
+        packages = with pkgs; [
+          cargo-hack
+          cargoAll
+        ];
+      };
     };
-  }
-  // (lib.optionalAttrs binary {
-    apps.default = flake-utils.lib.mkApp { drv = mainArtifact; };
-  })
-)
+
+  mkApp =
+    {
+      drv,
+      name ? drv.pname or drv.name,
+      exePath ? drv.passthru.exePath or "/bin/${name}",
+    }:
+    {
+      type = "app";
+      program = "${drv}${exePath}";
+    };
+
+  mkApps =
+    {
+      mainArtifact ? mkMainArtifacts { },
+    }:
+    {
+      default = mkApp { drv = mainArtifact; };
+    };
+
+  mkPackages =
+    {
+      mainArtifact ? mkMainArtifacts { },
+    }:
+    {
+      default = mainArtifact;
+    };
+in
+{
+  inherit
+    prepareFeatures
+    mkCraneLib
+    mkCraneLibDefault
+    mkCommonArgs
+    mkMainArgs
+    mkCargoArtifacts
+    mkMainArtifacts
+    mkCargoAll
+    mkTreefmtConfig
+    mkTreefmt
+    mkFormatter
+    mkChecks
+    mkDevShells
+    mkApp
+    mkApps
+    mkPackages
+    ;
+}
