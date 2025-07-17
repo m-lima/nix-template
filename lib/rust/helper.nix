@@ -1,100 +1,133 @@
 {
-  root,
   system,
+  root,
   pkgs,
   crane,
   fenix,
   treefmt-nix,
 }:
 let
-  stdenv = pkgs.stdenv;
-  lib = pkgs.stdenv;
+  inherit (pkgs) stdenv lib;
 
   listFeatures =
     arg: list:
     lib.optionalString (builtins.length list > 0) "${arg} ${builtins.concatStringsSep "," list}";
-
-  skipFeatures = listFeatures "--skip";
-
-  prepareFeatures = listFeatures "--features";
-
-  fenixPkgs = fenix.packages.${system};
-  overrideCraneLib = (crane.mkLib pkgs).overrideToolchain;
-
+in
+{
   mkCraneLib =
     {
       toolchains ? fenixPkgs: [ ],
     }:
-    overrideCraneLib (fenixPkgs.combine (toolchains fenixPkgs));
-  mkCraneLibDefault = overrideCraneLib fenixPkgs.stable.toolchain;
-
-  mkCommonArgs =
-    {
-      craneLib ? mkCraneLibDefault,
-      features ? [ ],
-      buildInputs ? pkgs: [ ],
-      nativeBuildInputs ? pkgs: [ ],
-      allowFilesets ? [ ],
-      mega ? true,
-    }:
-    {
-      strictDeps = true;
-      cargoExtraArgs = "--locked ${prepareFeatures features}";
-      nativeBuildInputs = nativeBuildInputs pkgs;
-      buildInputs = lib.optionals stdenv.isDarwin [ pkgs.libiconv ] ++ buildInputs pkgs;
-      src = lib.fileset.toSource {
-        inherit root;
-        fileset = lib.fileset.unions (
-          [
-            (craneLib.fileset.commonCargoSources root)
-          ]
-          ++ allowFilesets
-        );
-      };
-    }
-    // (lib.optionalAttrs mega {
-      CARGO_PROFILE = "mega";
-      CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-    });
-
-  mkMainArgs =
-    {
-      craneLib ? mkCraneLibDefault,
-      commonArgs ? mkCommonArgs { inherit craneLib; },
-      lockRandomSeed ? false,
-    }:
-    commonArgs
-    // (lib.optionalAttrs lockRandomSeed {
-      NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
-    });
-
-  mkCargoArtifacts =
-    {
-      craneLib ? mkCraneLibDefault,
-      commonArgs ? mkCommonArgs { inherit craneLib; },
-    }:
-    craneLib.buildDepsOnly commonArgs;
-
-  mkMainArtifacts =
-    {
-      craneLib ? mkCraneLibDefault,
-      commonArgs ? mkCommonArgs { inherit craneLib; },
-      mainArgs ? mkMainArgs { inherit craneLib commonArgs; },
-      cargoArtifacts ? mkCargoArtifacts {
-        inherit craneLib commonArgs;
-      },
-    }:
-    craneLib.buildPackage (
-      mainArgs
-      // {
-        inherit cargoArtifacts;
-      }
+    let
+      fenixPkgs = fenix.packages.${system};
+      resolvedToolchains = toolchains fenixPkgs;
+    in
+    (crane.mkLib pkgs).overrideToolchain (
+      if builtins.length resolvedToolchains == 0 then
+        fenixPkgs.stable.toolchain
+      else if builtins.length resolvedToolchains < 2 then
+        builtins.head resolvedToolchains
+      else
+        fenixPkgs.combine resolvedToolchains
     );
+
+  withCraneLib = craneLib: {
+    mkCommonArgs =
+      {
+        features ? [ ],
+        cargoExtraArgs ? "",
+        buildInputs ? [ ],
+        nativeBuildInputs ? [ ],
+        allowFilesets ? [ ],
+        mega ? true,
+      }:
+      let
+        prepareFeatures = listFeatures "--features";
+      in
+      {
+        inherit nativeBuildInputs buildInputs;
+        strictDeps = true;
+        cargoExtraArgs = "--locked ${prepareFeatures features} ${cargoExtraArgs}";
+        src = lib.fileset.toSource {
+          inherit root;
+          fileset = lib.fileset.unions (
+            [
+              (craneLib.fileset.commonCargoSources root)
+            ]
+            ++ allowFilesets
+          );
+        };
+      }
+      // (lib.optionalAttrs mega {
+        CARGO_PROFILE = "mega";
+        CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+      });
+
+    withCommonArgs = commonArgs: {
+      mkMainArgs =
+        {
+          lockRandomSeed ? false,
+        }:
+        commonArgs
+        // (lib.optionalAttrs lockRandomSeed {
+          NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
+        });
+
+      mkCargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+      withCargoArtifacts = cargoArtifacts: {
+        mkArtifacts =
+          {
+            args,
+          }:
+          craneLib.buildPackage (
+            args
+            // {
+              inherit cargoArtifacts;
+            }
+          );
+      };
+    };
+  };
+
+  mkTreefmt =
+    {
+      programs ? default: default,
+      settings ? default: default,
+    }:
+    {
+      programs = programs {
+        nixfmt.enable = true;
+        rustfmt = {
+          enable = true;
+          edition = "2024";
+        };
+        taplo.enable = true;
+      };
+      settings = settings {
+        excludes = [
+          "*.lock"
+          ".direnv/*"
+          ".envrc"
+          ".gitignore"
+          "result*/*"
+          "target/*"
+          "LICENSE"
+        ];
+      };
+    };
+
+  withTreefmt = treefmt: {
+    mkFormatter = treefmt.wrapper;
+  };
 
   mkCargoAll =
     {
       skip ? [ "default" ],
     }:
+    let
+      skipFeatures = listFeatures "--skip";
+    in
     pkgs.writeShellScriptBin "cargo-all" ''
       shift
 
@@ -142,159 +175,6 @@ let
       fi
     '';
 
-  mkTreefmtConfig =
-    {
-      programs ? default: default,
-      settings ? default: default,
-    }:
-    {
-      programs = programs {
-        nixfmt.enable = true;
-        rustfmt = {
-          enable = true;
-          edition = "2024";
-        };
-        taplo.enable = true;
-      };
-      settings = settings {
-        excludes = [
-          "*.lock"
-          ".direnv/*"
-          ".envrc"
-          ".gitignore"
-          "result*/*"
-          "target/*"
-          "LICENSE"
-        ];
-      };
-    };
-
-  mkTreefmt =
-    {
-      config ? mkTreefmtConfig { },
-    }:
-    (treefmt-nix.lib.evalModule pkgs config).config.build;
-
-  mkFormatter =
-    {
-      treefmt,
-    }:
-    treefmt.wrapper;
-
-  mkChecks =
-    {
-      outputs,
-      treefmt ? mkTreefmt { },
-      craneLib ? mkCraneLibDefault,
-      commonArgs ? mkCommonArgs { inherit craneLib; },
-      cargoArtifacts ? mkCargoArtifacts {
-        inherit craneLib commonArgs;
-      },
-      extraChecks ? { },
-      hack ? null,
-    }:
-    {
-      formatting = treefmt.check outputs;
-    }
-    // (
-      if builtins.isAttrs hack then
-        {
-          hack = craneLib.mkCargoDerivation (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-              buildPhaseCargoCommand = "cargo all";
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
-                pkgs.cargo-hack
-                hack
-              ];
-            }
-          );
-        }
-      else
-        {
-          clippy = craneLib.cargoClippy (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-              cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
-            }
-          );
-
-          clippy-tests = craneLib.cargoClippy (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-              pnameSuffix = "-clippy-tests";
-              cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
-            }
-          );
-
-          clippy-examples = craneLib.cargoClippy (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-              pnameSuffix = "-clippy-examples";
-              cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
-            }
-          );
-
-          docs = craneLib.cargoDoc (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-            }
-          );
-
-          tests = craneLib.cargoTest (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-            }
-          );
-        }
-    )
-    // (lib.optionalAttrs (builtins.hasAttr "readme" extraChecks && extraChecks.readme) {
-      readme = craneLib.mkCargoDerivation (
-        commonArgs
-        // {
-          inherit cargoArtifacts;
-          nativeBuildInputs = [ pkgs.cargo-readme ];
-          buildPhaseCargoCommand = "diff README.md <(cargo readme)";
-        }
-      );
-    })
-    // (lib.optionalAttrs
-      (builtins.hasAttr "bindgen" extraChecks && (builtins.isPath extraChecks.bindgen))
-      {
-        bindgen = craneLib.mkCargoDerivation (
-          commonArgs
-          // {
-            inherit cargoArtifacts;
-            nativeBuildInputs = [ pkgs.rust-cbindgen ];
-            buildPhaseCargoCommand = "diff ${extraChecks.bindgen} <(cbindgen .)";
-          }
-        );
-      }
-    );
-
-  mkDevShells =
-    {
-      checks ? mkChecks,
-      craneLib ? mkCraneLibDefault,
-      cargoAll ? mkCargoAll { },
-    }:
-    {
-      default = craneLib.devShell {
-        checks = checks;
-
-        packages = with pkgs; [
-          cargo-hack
-          cargoAll
-        ];
-      };
-    };
-
   mkApp =
     {
       drv,
@@ -305,40 +185,157 @@ let
       type = "app";
       program = "${drv}${exePath}";
     };
-
-  mkApps =
-    {
-      mainArtifact ? mkMainArtifacts { },
-    }:
-    {
-      default = mkApp { drv = mainArtifact; };
-    };
-
-  mkPackages =
-    {
-      mainArtifact ? mkMainArtifacts { },
-    }:
-    {
-      default = mainArtifact;
-    };
-in
-{
-  inherit
-    prepareFeatures
-    mkCraneLib
-    mkCraneLibDefault
-    mkCommonArgs
-    mkMainArgs
-    mkCargoArtifacts
-    mkMainArtifacts
-    mkCargoAll
-    mkTreefmtConfig
-    mkTreefmt
-    mkFormatter
-    mkChecks
-    mkDevShells
-    mkApp
-    mkApps
-    mkPackages
-    ;
 }
+
+#   mkTreefmt =
+#     {
+#       config ? mkTreefmtConfig { },
+#     }:
+#     (treefmt-nix.lib.evalModule pkgs config).config.build;
+#
+#   mkChecks =
+#     {
+#       outputs,
+#       treefmt ? mkTreefmt { },
+#       commonArgs ? mkCommonArgs { inherit craneLib; },
+#       cargoArtifacts ? mkCargoArtifacts {
+#         inherit craneLib commonArgs;
+#       },
+#       hack ? null,
+#       extraChecks ? { },
+#     }:
+#     {
+#       formatting = treefmt.check outputs;
+#     }
+#     // (
+#       if builtins.isAttrs hack then
+#         {
+#           hack = craneLib.mkCargoDerivation (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#               buildPhaseCargoCommand = "cargo all";
+#               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+#                 pkgs.cargo-hack
+#                 hack
+#               ];
+#             }
+#           );
+#         }
+#       else
+#         {
+#           clippy = craneLib.cargoClippy (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#               cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
+#             }
+#           );
+#
+#           clippy-tests = craneLib.cargoClippy (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#               pnameSuffix = "-clippy-tests";
+#               cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
+#             }
+#           );
+#
+#           clippy-examples = craneLib.cargoClippy (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#               pnameSuffix = "-clippy-examples";
+#               cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
+#             }
+#           );
+#
+#           docs = craneLib.cargoDoc (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#             }
+#           );
+#
+#           tests = craneLib.cargoTest (
+#             commonArgs
+#             // {
+#               inherit cargoArtifacts;
+#             }
+#           );
+#         }
+#     )
+#     // (lib.optionalAttrs (builtins.hasAttr "readme" extraChecks && extraChecks.readme) {
+#       readme = craneLib.mkCargoDerivation (
+#         commonArgs
+#         // {
+#           inherit cargoArtifacts;
+#           nativeBuildInputs = [ pkgs.cargo-readme ];
+#           buildPhaseCargoCommand = "diff README.md <(cargo readme)";
+#         }
+#       );
+#     })
+#     // (lib.optionalAttrs
+#       (builtins.hasAttr "bindgen" extraChecks && (builtins.isPath extraChecks.bindgen))
+#       {
+#         bindgen = craneLib.mkCargoDerivation (
+#           commonArgs
+#           // {
+#             inherit cargoArtifacts;
+#             nativeBuildInputs = [ pkgs.rust-cbindgen ];
+#             buildPhaseCargoCommand = "diff ${extraChecks.bindgen} <(cbindgen .)";
+#           }
+#         );
+#       }
+#     );
+#
+#   mkDevShells =
+#     {
+#       checks ? mkChecks,
+#       cargoAll ? mkCargoAll { },
+#     }:
+#     {
+#       default = craneLib.devShell {
+#         checks = checks;
+#
+#         packages = with pkgs; [
+#           cargo-hack
+#           cargoAll
+#         ];
+#       };
+#     };
+#
+#   mkApps =
+#     {
+#       mainArtifact ? mkMainArtifacts { },
+#     }:
+#     {
+#       default = mkApp { drv = mainArtifact; };
+#     };
+#
+#   mkPackages =
+#     {
+#       mainArtifact ? mkMainArtifacts { },
+#     }:
+#     {
+#       default = mainArtifact;
+#     };
+# in
+# {
+#   inherit
+#     prepareFeatures
+#     mkCommonArgs
+#     mkMainArgs
+#     mkCargoArtifacts
+#     mkMainArtifacts
+#     mkCargoAll
+#     mkTreefmtConfig
+#     mkTreefmt
+#     mkFormatter
+#     mkChecks
+#     mkDevShells
+#     mkApp
+#     mkApps
+#     mkPackages
+#     ;
+# }
