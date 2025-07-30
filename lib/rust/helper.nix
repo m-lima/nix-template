@@ -1,9 +1,10 @@
-#                                                   craneLib
-#                                                      │
-#                                                  commonArgs
-#                                             ╭───────╯ ╰──────╮
-#               treefmt      cargoAll   cargoArtifacts     mainArgs
-#                 │ ╰──────────╮│╭───────────╯ ╰──────╮ ╭──────╯
+#
+#               treefmt      cargoAll               craneLib
+#                 │ │           │                      │
+#                 │ │           │                  commonArgs
+#                 │ ╰──────────╮│             ╭───────╯ ╰──────╮
+#                 │            ││       cargoArtifacts     mainArgs
+#                 │            ││╭───────────╯ ╰──────╮ ╭──────╯
 #             formatting      checks                package
 #                               │
 #                            devShell
@@ -48,8 +49,6 @@ in
             fenixPkgs.combine resolvedToolchains
         );
 
-      default = use (make { });
-
       use = craneLib: {
         commonArgs =
           let
@@ -84,8 +83,6 @@ in
                 CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
               });
 
-            default = use (make { });
-
             use = commonArgs: {
               mainArgs = {
                 make =
@@ -101,23 +98,22 @@ in
               cargoArtifacts =
                 let
                   make = craneLib.buildDepsOnly commonArgs;
-                  default = use make;
                   use = {
                     # TODO
                   };
                 in
                 {
-                  inherit make use default;
+                  inherit make use;
                 };
             };
           in
           {
-            inherit make use default;
+            inherit make use;
           };
       };
     in
     {
-      inherit make default use;
+      inherit make use;
     };
 
   treefmt =
@@ -149,7 +145,6 @@ in
             ];
           };
         };
-      default = use (make { });
       use =
         config:
         let
@@ -161,7 +156,7 @@ in
         };
     in
     {
-      inherit make default use;
+      inherit make use;
     };
 
   output =
