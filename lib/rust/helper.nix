@@ -1,13 +1,13 @@
 #
-#               treefmt      cargoAll               craneLib
-#                 │ │           │                      │
-#                 │ │           │                  commonArgs
-#                 │ ╰──────────╮│             ╭───────╯ ╰──────╮
-#                 │            ││       cargoArtifacts     mainArgs
-#                 │            ││╭───────────╯ ╰──────╮ ╭──────╯
-#             formatting      checks                package
-#                               │
-#                            devShell
+#   treefmt           cargoAll          craneLib
+#     │ │                │                 │
+#     │ │                │             commonArgs
+#     │ │                │        ╭───────╯ ╰──────╮
+#     │ │                │  cargoArtifacts     mainArgs
+#     │ ╰───────────────╮│╭──────╯ ╰──────╮ ╭──────╯
+# formatting           checks           package
+#                        │
+#                     devShell
 
 {
   nixpkgs,
@@ -23,164 +23,152 @@
 }:
 let
   pkgs = nixpkgs.legacyPackages.${system};
-  inherit (pkgs) stdenv lib;
+  inherit (pkgs) lib;
 
   listFeatures =
     arg: list:
     lib.optionalString (builtins.length list > 0) "${arg} ${builtins.concatStringsSep "," list}";
 in
 {
-  craneLib =
-    let
-      make =
-        {
-          toolchains ? fenixPkgs: [ ],
-        }:
-        let
-          fenixPkgs = fenix.packages.${system};
-          resolvedToolchains = toolchains fenixPkgs;
-        in
-        (crane.mkLib pkgs).overrideToolchain (
-          if builtins.length resolvedToolchains == 0 then
-            fenixPkgs.stable.toolchain
-          else if builtins.length resolvedToolchains < 2 then
-            builtins.head resolvedToolchains
-          else
-            fenixPkgs.combine resolvedToolchains
-        );
+  craneLib = {
+    make =
+      {
+        toolchains ? fenixPkgs: [ ],
+      }:
+      let
+        fenixPkgs = fenix.packages.${system};
+        resolvedToolchains = toolchains fenixPkgs;
+      in
+      (crane.mkLib pkgs).overrideToolchain (
+        if builtins.length resolvedToolchains == 0 then
+          fenixPkgs.stable.toolchain
+        else if builtins.length resolvedToolchains < 2 then
+          builtins.head resolvedToolchains
+        else
+          fenixPkgs.combine resolvedToolchains
+      );
 
-      use = craneLib: {
-        commonArgs =
-          let
-            make =
-              {
-                features ? [ ],
-                cargoExtraArgs ? "",
-                buildInputs ? [ ],
-                nativeBuildInputs ? [ ],
-                allowFilesets ? [ ],
-                mega ? true,
-              }:
-              let
-                prepareFeatures = listFeatures "--features";
-              in
-              {
-                inherit nativeBuildInputs buildInputs;
-                strictDeps = true;
-                cargoExtraArgs = "--locked ${prepareFeatures features} ${cargoExtraArgs}";
-                src = lib.fileset.toSource {
-                  inherit root;
-                  fileset = lib.fileset.unions (
-                    [
-                      (craneLib.fileset.commonCargoSources root)
-                    ]
-                    ++ allowFilesets
-                  );
-                };
-              }
-              // (lib.optionalAttrs mega {
-                CARGO_PROFILE = "mega";
-                CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-              });
+    use = (import ./craneLib) { inherit pkgs root listFeatures; };
+  };
 
-            use = commonArgs: {
-              mainArgs = {
-                make =
-                  {
-                    lockRandomSeed ? false,
-                  }:
-                  commonArgs
-                  // (lib.optionalAttrs lockRandomSeed {
-                    NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
-                  });
-              };
-
-              cargoArtifacts =
-                let
-                  make = craneLib.buildDepsOnly commonArgs;
-                  use = {
-                    # TODO
-                  };
-                in
-                {
-                  inherit make use;
-                };
-            };
-          in
-          {
-            inherit make use;
+  treefmt = {
+    make =
+      {
+        programs ? default: default,
+        settings ? default: default,
+      }:
+      {
+        projectRootFile = "Cargo.toml";
+        programs = programs {
+          nixfmt.enable = true;
+          rustfmt = {
+            enable = true;
+            edition = "2024";
           };
+          taplo.enable = true;
+        };
+        settings = settings {
+          excludes = [
+            "*.lock"
+            ".direnv/*"
+            ".envrc"
+            ".gitignore"
+            "result*/*"
+            "target/*"
+            "LICENSE"
+          ];
+        };
       };
-    in
-    {
-      inherit make use;
-    };
 
-  treefmt =
-    let
-      make =
-        {
-          programs ? default: default,
-          settings ? default: default,
-        }:
-        {
-          projectRootFile = "Cargo.toml";
-          programs = programs {
-            nixfmt.enable = true;
-            rustfmt = {
-              enable = true;
-              edition = "2024";
-            };
-            taplo.enable = true;
-          };
-          settings = settings {
-            excludes = [
-              "*.lock"
-              ".direnv/*"
-              ".envrc"
-              ".gitignore"
-              "result*/*"
-              "target/*"
-              "LICENSE"
-            ];
-          };
-        };
-      use =
-        config:
-        let
-          treefmt = (treefmt-nix.lib.evalModule pkgs config).config.build;
-        in
-        {
-          formatter = treefmt.wrapper;
-          check = treefmt.check self;
-        };
-    in
-    {
-      inherit make use;
-    };
+    use =
+      config:
+      let
+        treefmt = (treefmt-nix.lib.evalModule pkgs config).config.build;
+      in
+      {
+        formatter = treefmt.wrapper;
+        check = treefmt.check self;
+      };
+  };
 
-  output =
-    {
-      checks,
-      formatter,
-      package,
-      devShell,
-      app ? null,
-    }:
-    {
-      inherit checks formatter;
-      packages.default = package;
-      devShells.default = devShell;
-      # craneLib.devShell {
-      #   inherit checks;
-      #   packages = with pkgs; [
-      #     cargo-hack
-      #     cargoAll
-      # ];
-    }
-    // (lib.optionalAttrs (!builtins.isNull app) {
-      apps.default = app;
-    });
+  cargoAll = {
+    make =
+      {
+        skip ? [ "default" ],
+      }:
+      let
+        skipFeatures = listFeatures "--skip";
+      in
+      pkgs.writeShellScriptBin "cargo-all" ''
+        shift
+
+        skip="${skipFeatures skip}"
+
+        while (( $# > 0 )); do
+          case "$1" in
+            nightly)
+              nightly='+nightly' ;;
+            run|r)
+              run=1 ;;
+            clean|c)
+              clean=1 ;;
+            skip|s)
+              shift
+              skip="--skip $1"
+              ;;
+          esac
+          shift
+        done
+
+        if [ $clean ]; then
+          echo "[34mCleaning[m" && \
+          cargo clean
+        fi && \
+        echo "[34mFormatting[m" && \
+        cargo $nightly fmt --all && \
+        echo "[34mChecking main[m" && \
+        cargo $nightly hack --feature-powerset $skip check --workspace $@ && \
+        echo "[34mChecking examples[m" && \
+        cargo $nightly hack --feature-powerset $skip check --workspace --examples $@ && \
+        echo "[34mChecking tests[m" && \
+        cargo $nightly hack --feature-powerset $skip check --workspace --tests $@ && \
+        echo "[34mLinting main[m" && \
+        cargo $nightly hack --feature-powerset $skip clippy --workspace $@ && \
+        echo "[34mLinting tests[m" && \
+        cargo $nightly hack --feature-powerset $skip clippy --workspace --tests $@ && \
+        echo "[34mLinting examples[m" && \
+        cargo $nightly hack --feature-powerset $skip clippy --workspace --examples $@ && \
+        echo "[34mTesting main[m" && \
+        cargo $nightly hack --feature-powerset $skip test --workspace $@ && \
+        if [ "$run" ]; then
+          echo "[34mRunning[m" && \
+          cargo $nightly run $@
+        fi
+      '';
+  };
+
+  # output =
+  #   {
+  #     checks,
+  #     formatter,
+  #     package,
+  #     devShell,
+  #     app ? null,
+  #   }:
+  #   {
+  #     inherit checks formatter;
+  #     packages.default = package;
+  #     devShells.default = devShell;
+  #     # craneLib.devShell {
+  #     #   inherit checks;
+  #     #   packages = with pkgs; [
+  #     #     cargo-hack
+  #     #     cargoAll
+  #     # ];
+  #   }
+  #   // (lib.optionalAttrs (!builtins.isNull app) {
+  #     apps.default = app;
+  #   });
 }
 
 #   withCraneLib =
