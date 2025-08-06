@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     crane.url = "github:ipetkov/crane";
     fenix = {
       url = "github:nix-community/fenix";
@@ -15,13 +15,21 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
-    helper.url = "github:m-lima/nix-template";
+    helper.url = "github:m-lima/nix-template?ref=wip";
   };
 
   outputs =
     {
+      self,
+      flake-utils,
       helper,
       ...
     }@inputs:
-    helper.lib.rust.helper inputs { } ./. "rust_template";
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      (helper.lib.rust.helper inputs {
+        inherit self system;
+        root = ./.;
+      }).outputs
+    );
 }
