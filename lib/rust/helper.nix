@@ -275,6 +275,17 @@ rec {
     })
   );
 
+  devShell = tryOverride "devShell" {
+    checks = checks;
+
+    packages = with pkgs; [
+      cargo-hack
+      cargoAll
+    ];
+  };
+
+  formatter = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.wrapper;
+
   outputs =
     {
       packages =
@@ -285,15 +296,9 @@ rec {
           deps = cargoArtifacts;
         });
 
-      formatter = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.wrapper;
-      devShells.default = craneLib.devShell {
-        checks = checks;
-
-        packages = with pkgs; [
-          cargo-hack
-          cargoAll
-        ];
-      };
+      checks = checks;
+      formatter = formatter;
+      devShells.default = craneLib.devShell devShell;
     }
     // (lib.optionalAttrs binary {
       apps.default = mkApp { drv = mainArtifact; };
