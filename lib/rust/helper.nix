@@ -8,16 +8,15 @@
 #                        │
 #                     devShell
 {
+  self,
   nixpkgs,
   crane,
   fenix,
   treefmt-nix,
   ...
 }:
+system: root:
 {
-  self,
-  system,
-  root,
   toolchains ? fenixPkgs: [ ],
   features ? [ ],
   cargoExtraArgs ? "",
