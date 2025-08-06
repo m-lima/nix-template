@@ -25,11 +25,5 @@
       helper,
       ...
     }@inputs:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      (helper.lib.rust.helper inputs {
-        inherit self system;
-        root = ./.;
-      }).outputs
-    );
+    flake-utils.lib.eachDefaultSystem (system: (helper.lib.rust.helper inputs system ./. { }).outputs);
 }
