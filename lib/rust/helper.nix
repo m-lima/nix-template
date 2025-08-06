@@ -26,6 +26,7 @@ system: root:
   mega ? true,
   binary ? true,
   skip ? [ "default" ],
+  formatters ? formatters: formatters,
   lockRandomSeed ? false, # Useful when using `cc`
   hack ? false, # If cargo-all with cargo-hack should be used
   readme ? false, # If cargo-readme should be used to check the README.md file
@@ -117,7 +118,7 @@ rec {
 
   treefmt = tryOverride "treefmt" {
     projectRootFile = "Cargo.toml";
-    programs = {
+    programs = formatters {
       nixfmt.enable = true;
       rustfmt = {
         enable = true;
