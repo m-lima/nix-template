@@ -26,7 +26,7 @@ system: root:
   mega ? true,
   binary ? true,
   skip ? [ "default" ],
-  formatters ? formatters: formatters,
+  formatters ? { },
   lockRandomSeed ? false, # Useful when using `cc`
   hack ? false, # If cargo-all with cargo-hack should be used
   readme ? false, # If cargo-readme should be used to check the README.md file
@@ -41,15 +41,18 @@ let
     arg: list:
     lib.optionalString (builtins.length list > 0) "${arg} ${builtins.concatStringsSep "," list}";
 
+  override =
+    overrider: default:
+    if builtins.isFunction overrider then
+      overrider default
+    else if builtins.isList default then
+      default ++ overrider
+    else
+      default // overrider;
+
   tryOverride =
     name: default:
-    if builtins.hasAttr name overrides then
-      if builtins.isFunction overrides.${name} then
-        overrides.${name} default
-      else
-        builtins.abort "override.${name} is expected to be a function"
-    else
-      default;
+    if builtins.hasAttr name overrides then override overrides.${name} default else default;
 in
 rec {
   mkApp =
@@ -118,7 +121,7 @@ rec {
 
   treefmt = tryOverride "treefmt" {
     projectRootFile = "Cargo.toml";
-    programs = formatters {
+    programs = override formatters {
       nixfmt.enable = true;
       rustfmt = {
         enable = true;
