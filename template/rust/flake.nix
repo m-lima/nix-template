@@ -15,7 +15,7 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
-    helper.url = "github:m-lima/nix-template?ref=wip";
+    helper.url = "github:m-lima/nix-template";
   };
 
   outputs =
