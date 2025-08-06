@@ -127,6 +127,7 @@ rec {
       taplo.enable = true;
     };
     settings = {
+      on-unmatched = "warn";
       excludes = [
         "*.lock"
         ".direnv/*"
