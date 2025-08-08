@@ -217,6 +217,20 @@ rec {
   );
 
   checks = tryOverride "checks" (
+    let
+      checkCommonArgs =
+        if mega then
+          commonArgs
+          // {
+            CARGO_PROFILE = builtins.replaceStrings [ "mega" ] [ "" ] commonArgs.CARGO_PROFILE;
+            CARGO_BUILD_RUSTFLAGS =
+              builtins.replaceStrings [ "-C target-cpu=native -C prefer-dynamic=no" ] [ "" ]
+                commonArgs.CARGO_BUILD_RUSTFLAGS;
+          }
+        else
+          commonArgs;
+      checkCargoArtifacts = craneLib.buildDepsOnly checkCommonArgs;
+    in
     {
       formatting = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.check self;
     }
@@ -224,11 +238,11 @@ rec {
       if hack then
         {
           hack = craneLib.mkCargoDerivation (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
               buildPhaseCargoCommand = "cargo all";
-              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [
+              nativeBuildInputs = (checkCommonArgs.nativeBuildInputs or [ ]) ++ [
                 pkgs.cargo-hack
                 cargoAll
               ];
@@ -238,52 +252,52 @@ rec {
       else
         {
           clippy = craneLib.cargoClippy (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
               cargoClippyExtraArgs = "-- -D warnings -W clippy::pedantic";
             }
           );
 
           clippy-tests = craneLib.cargoClippy (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
               pnameSuffix = "-clippy-tests";
               cargoClippyExtraArgs = "--tests -- -D warnings -W clippy::pedantic";
             }
           );
 
           clippy-examples = craneLib.cargoClippy (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
               pnameSuffix = "-clippy-examples";
               cargoClippyExtraArgs = "--examples -- -D warnings -W clippy::pedantic";
             }
           );
 
           docs = craneLib.cargoDoc (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
               cargoDocExtraArgs = "--no-deps --all-features";
             }
           );
 
           tests = craneLib.cargoTest (
-            commonArgs
+            checkCommonArgs
             // {
-              inherit cargoArtifacts;
+              cargoArtifacts = checkCargoArtifacts;
             }
           );
         }
     )
     // (lib.optionalAttrs readme {
       readme = craneLib.mkCargoDerivation (
-        commonArgs
+        checkCommonArgs
         // {
-          inherit cargoArtifacts;
+          cargoArtifacts = checkCargoArtifacts;
           nativeBuildInputs = [ pkgs.cargo-readme ];
           buildPhaseCargoCommand = "diff README.md <(cargo readme)";
         }
@@ -291,9 +305,9 @@ rec {
     })
     // (lib.optionalAttrs (builtins.isPath bindgen) {
       bindgen = craneLib.mkCargoDerivation (
-        commonArgs
+        checkCommonArgs
         // {
-          inherit cargoArtifacts;
+          cargoArtifacts = checkCargoArtifacts;
           nativeBuildInputs = [ pkgs.rust-cbindgen ];
           buildPhaseCargoCommand = "diff ${checks.bindgen} <(cbindgen .)";
         }
