@@ -207,6 +207,8 @@ rec {
       cargo $nightly hack --feature-powerset $skip clippy --workspace --examples $@ && \
       echo "[34mTesting main[m" && \
       cargo $nightly hack --feature-powerset $skip test --workspace $@ && \
+      echo "[34mGenerating docs[m" && \
+      cargo $nightly doc --workspace --all-features $@ && \
       if [ "$run" ]; then
         echo "[34mRunning[m" && \
         cargo $nightly run $@
