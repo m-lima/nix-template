@@ -97,6 +97,12 @@ rec {
             (craneLib.fileset.commonCargoSources root)
           ]
           ++ allowFilesets
+          ++ (lib.flatten (
+            lib.optional readme [
+              (root + "/README.md")
+              (root + "/README.tpl")
+            ]
+          ))
         );
       };
     }
@@ -121,26 +127,39 @@ rec {
 
   treefmt = tryOverride "treefmt" {
     projectRootFile = "Cargo.toml";
-    programs = override formatters {
-      nixfmt.enable = true;
-      rustfmt = {
-        enable = true;
-        edition = "2024";
-      };
-      taplo.enable = true;
-    };
-    settings = {
-      on-unmatched = "warn";
-      excludes = [
-        "*.lock"
-        ".direnv/*"
-        ".envrc"
-        ".gitignore"
-        "result*/*"
-        "target/*"
-        "LICENSE"
-      ];
-    };
+    programs = override formatters (
+      {
+        nixfmt.enable = true;
+        rustfmt = {
+          enable = true;
+          edition = "2024";
+        };
+        taplo.enable = true;
+      }
+      // (lib.optionalAttrs readme {
+        mdformat.enable = true;
+      })
+    );
+    settings =
+      {
+        on-unmatched = "warn";
+        excludes = [
+          "*.lock"
+          ".direnv/*"
+          ".envrc"
+          ".gitignore"
+          "result*/*"
+          "target/*"
+          "LICENSE"
+        ];
+      }
+      // (lib.optionalAttrs readme {
+        formatter = {
+          mdformat.includes = [
+            "README.tpl"
+          ];
+        };
+      });
   };
 
   cargoAll = tryOverride "cargoAll" (
