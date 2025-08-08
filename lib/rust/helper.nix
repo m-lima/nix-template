@@ -267,6 +267,7 @@ rec {
             commonArgs
             // {
               inherit cargoArtifacts;
+              cargoDocExtraArgs = "--no-deps --all-features";
             }
           );
 
