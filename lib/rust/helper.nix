@@ -211,7 +211,7 @@ rec {
       echo "[34mTesting main[m" && \
       cargo $nightly hack --feature-powerset $skip test --workspace $@ && \
       echo "[34mGenerating docs[m" && \
-      cargo $nightly doc --workspace --all-features $@ && \
+      cargo $nightly doc --workspace --no-deps --all-features $@ && \
       if [ "$run" ]; then
         echo "[34mRunning[m" && \
         cargo $nightly run $@
