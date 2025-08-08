@@ -19,6 +19,7 @@ system: root:
 {
   toolchains ? fenixPkgs: [ ],
   features ? [ ],
+  noDefaultFeatures ? false,
   cargoExtraArgs ? "",
   buildInputs ? pkgs: [ ],
   nativeBuildInputs ? pkgs: [ ],
@@ -89,7 +90,9 @@ rec {
       nativeBuildInputs = nativeBuildInputs pkgs;
       buildInputs = buildInputs pkgs;
       strictDeps = true;
-      cargoExtraArgs = "--locked ${prepareFeatures features} ${cargoExtraArgs}";
+      cargoExtraArgs =
+        "--locked ${prepareFeatures features} ${cargoExtraArgs}"
+        + (lib.optionalString noDefaultFeatures "--no-default-features");
       src = lib.fileset.toSource {
         inherit root;
         fileset = lib.fileset.unions (
