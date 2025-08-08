@@ -138,6 +138,7 @@ rec {
           edition = "2024";
         };
         taplo.enable = true;
+        yamlfmt.enable = true;
       }
       // (lib.optionalAttrs readme {
         mdformat.enable = true;
