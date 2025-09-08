@@ -28,6 +28,7 @@ system: root:
   binary ? true,
   skip ? [ "default" ],
   formatters ? { },
+  monolithic ? false,
   lockRandomSeed ? false, # Useful when using `cc`
   hack ? false, # If cargo-all with cargo-hack should be used
   readme ? false, # If cargo-readme should be used to check the README.md file
@@ -122,7 +123,14 @@ rec {
     })
   );
 
-  cargoArtifacts = tryOverride "cargoArtifacts" (craneLib.buildDepsOnly commonArgs);
+  cargoArtifacts =
+    if monolithic then
+      if builtins.hasAttr "cargoArtifacts" overrides then
+        builtins.abort "Cannot override `cargoArtifacts` when building a monolithic project"
+      else
+        ""
+    else
+      tryOverride "cargoArtifacts" (craneLib.buildDepsOnly commonArgs);
 
   mainArtifact = tryOverride "mainArtifact" (
     craneLib.buildPackage (mainArgs // { inherit cargoArtifacts; })
@@ -233,7 +241,7 @@ rec {
           }
         else
           commonArgs;
-      checkCargoArtifacts = craneLib.buildDepsOnly checkCommonArgs;
+      checkCargoArtifacts = if monolithic then mainArtifact else craneLib.buildDepsOnly checkCommonArgs;
     in
     {
       formatting = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.check self;
@@ -332,14 +340,7 @@ rec {
 
   outputs =
     {
-      packages =
-        {
-          default = mainArtifact;
-        }
-        // (lib.optionalAttrs (!binary) {
-          deps = cargoArtifacts;
-        });
-
+      packages.default = mainArtifact;
       checks = checks;
       formatter = formatter;
       devShells.default = craneLib.devShell devShell;
