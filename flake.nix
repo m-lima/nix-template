@@ -11,6 +11,10 @@
           description = "Rust scaffold";
           path = ./template/rust;
         };
+        pypolars = {
+          description = "A quick setup for running polars in python";
+          path = ./template/pypolars;
+        };
       };
 
       lib = {
