@@ -12,8 +12,16 @@
           path = ./template/rust;
         };
         pypolars = {
-          description = "A quick setup for running polars in python";
+          description = "Python with polars and vim notebook";
           path = ./template/pypolars;
+        };
+        shell-pypolars = {
+          description = "A quick setup for running polars in python";
+          path = ./template/nupolars;
+        };
+        shell-nupolars = {
+          description = "A quick setup for running polars in nushell";
+          path = ./template/nupolars;
         };
       };
 
