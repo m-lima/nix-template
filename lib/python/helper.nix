@@ -16,19 +16,18 @@ flake-utils.lib.eachDefaultSystem (
     treefmt =
       (treefmt-nix.lib.evalModule pkgs {
         projectRootFile = "flake.nix";
-        programs =
-          {
-            nixfmt.enable = true;
-            mypy.enable = true;
-          }
-          // (lib.listToAttrs (
-            map (x: {
-              name = x;
-              value = {
-                enable = true;
-              };
-            }) fmts
-          ));
+        programs = {
+          nixfmt.enable = true;
+          mypy.enable = true;
+        }
+        // (lib.listToAttrs (
+          map (x: {
+            name = x;
+            value = {
+              enable = true;
+            };
+          }) fmts
+        ));
         settings = {
           excludes = [
             "*.lock"
@@ -47,7 +46,8 @@ flake-utils.lib.eachDefaultSystem (
     devShells.default = pkgs.mkShell {
       buildInputs = [
         pkgs.python312
-      ] ++ buildInputs pkgs;
+      ]
+      ++ buildInputs pkgs;
     };
   }
 )

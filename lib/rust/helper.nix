@@ -152,26 +152,25 @@ rec {
         mdformat.enable = true;
       })
     );
-    settings =
-      {
-        on-unmatched = "warn";
-        excludes = [
-          "*.lock"
-          ".direnv/*"
-          ".envrc"
-          ".gitignore"
-          "result*/*"
-          "target/*"
-          "LICENSE"
+    settings = {
+      on-unmatched = "warn";
+      excludes = [
+        "*.lock"
+        ".direnv/*"
+        ".envrc"
+        ".gitignore"
+        "result*/*"
+        "target/*"
+        "LICENSE"
+      ];
+    }
+    // (lib.optionalAttrs readme {
+      formatter = {
+        mdformat.includes = [
+          "README.tpl"
         ];
-      }
-      // (lib.optionalAttrs readme {
-        formatter = {
-          mdformat.includes = [
-            "README.tpl"
-          ];
-        };
-      });
+      };
+    });
   };
 
   cargoAll = tryOverride "cargoAll" (
@@ -338,14 +337,13 @@ rec {
 
   formatter = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.wrapper;
 
-  outputs =
-    {
-      packages.default = mainArtifact;
-      checks = checks;
-      formatter = formatter;
-      devShells.default = craneLib.devShell devShell;
-    }
-    // (lib.optionalAttrs binary {
-      apps.default = mkApp { drv = mainArtifact; };
-    });
+  outputs = {
+    packages.default = mainArtifact;
+    checks = checks;
+    formatter = formatter;
+    devShells.default = craneLib.devShell devShell;
+  }
+  // (lib.optionalAttrs binary {
+    apps.default = mkApp { drv = mainArtifact; };
+  });
 }
