@@ -55,6 +55,15 @@ let
   tryOverride =
     name: default:
     if builtins.hasAttr name overrides then override overrides.${name} default else default;
+
+  # FIX: With rust 1.90.0, on x86_64-linux, then linker is shipped with the toolchain.
+  # This can cause problems with Nix. This env var disables the shipped linker
+  rust190_fix = {
+    env = lib.optionalAttrs (system == "x86_64-linux") {
+      RUSTFLAGS = "-C link-self-contained=-linker";
+    };
+    pkgs = lib.optional (system == "x86_64-linux") pkgs.llvmPackages.bintools;
+  };
 in
 rec {
   mkApp =
@@ -88,7 +97,7 @@ rec {
       prepareFeatures = listFeatures "--features";
     in
     {
-      nativeBuildInputs = nativeBuildInputs pkgs;
+      nativeBuildInputs = rust190_fix.pkgs ++ nativeBuildInputs pkgs;
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -109,6 +118,8 @@ rec {
           ))
         );
       };
+
+      env = rust190_fix.env;
     }
     // (lib.optionalAttrs mega {
       CARGO_PROFILE = "mega";
@@ -328,6 +339,8 @@ rec {
 
   devShell = tryOverride "devShell" {
     checks = checks;
+
+    env = rust190_fix.env;
 
     packages = with pkgs; [
       cargo-hack
