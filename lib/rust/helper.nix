@@ -97,7 +97,11 @@ rec {
       prepareFeatures = listFeatures "--features";
     in
     {
-      nativeBuildInputs = rust190_fix.pkgs ++ nativeBuildInputs pkgs;
+      nativeBuildInputs =
+        rust190_fix.pkgs
+        ++ (nativeBuildInputs pkgs)
+        ++ (lib.optional readme pkgs.cargo-readme)
+        ++ (lib.optional (bindgen != null) pkgs.rust-cbindgen);
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -320,7 +324,6 @@ rec {
         checkCommonArgs
         // {
           cargoArtifacts = checkCargoArtifacts;
-          nativeBuildInputs = [ pkgs.cargo-readme ];
           buildPhaseCargoCommand = "diff README.md <(cargo readme)";
         }
       );
@@ -330,23 +333,23 @@ rec {
         checkCommonArgs
         // {
           cargoArtifacts = checkCargoArtifacts;
-          nativeBuildInputs = [ pkgs.rust-cbindgen ];
-          buildPhaseCargoCommand = "diff ${checks.bindgen} <(cbindgen .)";
+          buildPhaseCargoCommand = "diff ${bindgen} <(cbindgen .)";
         }
       );
     })
   );
 
-  devShell = tryOverride "devShell" {
-    checks = checks;
+  devShell = tryOverride "devShell" (
+    mainArgs
+    // {
+      checks = checks;
 
-    env = rust190_fix.env;
-
-    packages = with pkgs; [
-      cargo-hack
-      cargoAll
-    ];
-  };
+      packages = with pkgs; [
+        cargo-hack
+        cargoAll
+      ];
+    }
+  );
 
   formatter = (treefmt-nix.lib.evalModule pkgs treefmt).config.build.wrapper;
 
