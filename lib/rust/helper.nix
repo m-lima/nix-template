@@ -181,6 +181,9 @@ rec {
     }
     // (lib.optionalAttrs readme {
       formatter = {
+        mdformat.excludes = [
+          "README.md"
+        ];
         mdformat.includes = [
           "README.tpl"
         ];
