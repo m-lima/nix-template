@@ -61,6 +61,7 @@ let
   rust190_fix = {
     env = lib.optionalAttrs (system == "x86_64-linux") {
       RUSTFLAGS = "-C link-self-contained=-linker";
+      RUSTDOCFLAGS = "-C link-self-contained=-linker";
     };
     pkgs = lib.optional (system == "x86_64-linux") pkgs.llvmPackages.bintools;
   };
