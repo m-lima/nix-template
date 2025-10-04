@@ -17,7 +17,10 @@
 }:
 system: root:
 {
+  # cranelib
   toolchains ? fenixPkgs: [ ],
+
+  # commonArgs
   features ? [ ],
   noDefaultFeatures ? false,
   cargoExtraArgs ? "",
@@ -25,12 +28,27 @@ system: root:
   nativeBuildInputs ? pkgs: [ ],
   allowFilesets ? [ ],
   mega ? true,
-  binary ? true,
-  skip ? [ "default" ],
-  formatters ? { },
-  monolithic ? false,
+  noRust190Hack ? false, # Useful when cross compiling
+
+  # mainArgs
   lockRandomSeed ? false, # Useful when using `cc`
+
+  # cargoArtifact
+  monolithic ? false, # Useful when cross compiling
+
+  # apps
+  binary ? true, # Generate a app entry
+
+  # cargoAll
+  skip ? [ "default" ],
+
+  # treeFmt
+  formatters ? { },
+  fmtSettings ? { },
+
   hack ? false, # If cargo-all with cargo-hack should be used
+
+  # general
   readme ? false, # If cargo-readme should be used to check the README.md file
   bindgen ? null, # Path to the generated bindgen file, if it should be checked
   overrides ? { },
@@ -59,11 +77,11 @@ let
   # FIX: With rust 1.90.0, on x86_64-linux, then linker is shipped with the toolchain.
   # This can cause problems with Nix. This env var disables the shipped linker
   rust190_fix = {
-    env = lib.optionalAttrs (system == "x86_64-linux") {
+    env = lib.optionalAttrs (!noRust190Hack && system == "x86_64-linux") {
       RUSTFLAGS = "-C link-self-contained=-linker";
       RUSTDOCFLAGS = "-C link-self-contained=-linker";
     };
-    pkgs = lib.optional (system == "x86_64-linux") pkgs.llvmPackages.bintools;
+    pkgs = lib.optional (!noRust190Hack && system == "x86_64-linux") pkgs.llvmPackages.bintools;
   };
 in
 rec {
@@ -168,28 +186,30 @@ rec {
         mdformat.enable = true;
       })
     );
-    settings = {
-      on-unmatched = "warn";
-      excludes = [
-        "*.lock"
-        ".direnv/*"
-        ".envrc"
-        ".gitignore"
-        "result*/*"
-        "target/*"
-        "LICENSE"
-      ];
-    }
-    // (lib.optionalAttrs readme {
-      formatter = {
-        mdformat.excludes = [
-          "README.md"
+    settings = override fmtSettings (
+      {
+        on-unmatched = "warn";
+        excludes = [
+          "*.lock"
+          ".direnv/*"
+          ".envrc"
+          ".gitignore"
+          "result*/*"
+          "target/*"
+          "LICENSE"
         ];
-        mdformat.includes = [
-          "README.tpl"
-        ];
-      };
-    });
+      }
+      // (lib.optionalAttrs readme {
+        formatter = {
+          mdformat.excludes = [
+            "README.md"
+          ];
+          mdformat.includes = [
+            "README.tpl"
+          ];
+        };
+      })
+    );
   };
 
   cargoAll = tryOverride "cargoAll" (
