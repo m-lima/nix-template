@@ -20,7 +20,6 @@
 
   outputs =
     {
-      self,
       flake-utils,
       helper,
       ...
