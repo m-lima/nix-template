@@ -370,6 +370,7 @@ rec {
 
       packages = with pkgs; [
         cargo-hack
+        cargo-outdated
         cargoAll
       ];
     }
