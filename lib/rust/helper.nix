@@ -28,7 +28,7 @@ system: root:
   nativeBuildInputs ? pkgs: [ ],
   allowFilesets ? [ ],
   mega ? true,
-  noRust190Hack ? false, # Useful when cross compiling
+  enableRust190Fix ? true, # Useful when cross compiling
 
   # mainArgs
   lockRandomSeed ? false, # Useful when using `cc`
@@ -76,13 +76,17 @@ let
 
   # FIX: With rust 1.90.0, on x86_64-linux, then linker is shipped with the toolchain.
   # This can cause problems with Nix. This env var disables the shipped linker
-  rust190_fix = {
-    env = lib.optionalAttrs (!noRust190Hack && system == "x86_64-linux") {
-      RUSTFLAGS = "-C link-self-contained=-linker";
-      RUSTDOCFLAGS = "-C link-self-contained=-linker";
+  rust190_fix =
+    let
+      shouldFix = enableRust190Fix && system == "x86_64-linux";
+    in
+    {
+      env = lib.optionalAttrs shouldFix {
+        RUSTFLAGS = "-C link-self-contained=-linker";
+        RUSTDOCFLAGS = "-C link-self-contained=-linker";
+      };
+      pkgs = lib.optional shouldFix pkgs.llvmPackages.bintools;
     };
-    pkgs = lib.optional (!noRust190Hack && system == "x86_64-linux") pkgs.llvmPackages.bintools;
-  };
 in
 rec {
   mkApp =
