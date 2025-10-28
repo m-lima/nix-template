@@ -33,6 +33,9 @@ system: root:
   # mainArgs
   lockRandomSeed ? false, # Useful when using `cc`
 
+  # devShell
+  devPackages ? pkgs: [ ],
+
   # cargoArtifact
   monolithic ? false, # Useful when cross compiling
 
@@ -370,13 +373,16 @@ rec {
   devShell = tryOverride "devShell" (
     mainArgs
     // {
-      checks = checks;
+      inherit checks;
 
-      packages = with pkgs; [
-        cargo-hack
-        cargo-outdated
-        cargoAll
-      ];
+      packages =
+        with pkgs;
+        [
+          cargo-hack
+          cargo-outdated
+          cargoAll
+        ]
+        ++ (devPackages pkgs);
     }
   );
 
