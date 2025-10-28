@@ -178,7 +178,7 @@ rec {
   );
 
   treefmt = tryOverride "treefmt" {
-    projectRootFile = "Cargo.toml";
+    projectRootFile = "${root}/Cargo.toml";
     programs = override formatters (
       {
         nixfmt.enable = true;
