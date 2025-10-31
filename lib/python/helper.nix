@@ -7,20 +7,14 @@
 {
   fmts ? [ ],
   buildInputs ? _: [ ],
-  pythonPkgs ? _: [ ],
+  packages ? null,
+  overridePython ? null,
 }:
 flake-utils.lib.eachDefaultSystem (
   system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib;
-    python = pkgs.python3.withPackages (
-      ps:
-      (pythonPkgs ps)
-      ++ [
-        ps.venvShellHook
-      ]
-    );
     treefmt =
       (treefmt-nix.lib.evalModule pkgs {
         projectRootFile = "flake.nix";
@@ -48,11 +42,13 @@ flake-utils.lib.eachDefaultSystem (
           ];
         };
       }).config.build;
+    python = if builtins.isNull overridePython then pkgs.python312 else overridePython;
+    pyPkgs = if builtins.isNull packages then python else python.withPackages packages;
   in
   {
     formatter = treefmt.wrapper;
     devShells.default = pkgs.mkShell {
-      packages = [ python ];
+      packages = [ pyPkgs ];
       buildInputs = buildInputs pkgs;
 
       shellHook = ''
