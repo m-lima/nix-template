@@ -28,7 +28,6 @@ system: root:
   nativeBuildInputs ? pkgs: [ ],
   allowFilesets ? [ ],
   mega ? true,
-  enableRust190Fix ? true, # Useful when cross compiling
 
   # mainArgs
   lockRandomSeed ? false, # Useful when using `cc`
@@ -76,20 +75,6 @@ let
   tryOverride =
     name: default:
     if builtins.hasAttr name overrides then override overrides.${name} default else default;
-
-  # FIX: With rust 1.90.0, on x86_64-linux, then linker is shipped with the toolchain.
-  # This can cause problems with Nix. This env var disables the shipped linker
-  rust190_fix =
-    let
-      shouldFix = enableRust190Fix && system == "x86_64-linux";
-    in
-    {
-      env = lib.optionalAttrs shouldFix {
-        RUSTFLAGS = "-C link-self-contained=-linker";
-        RUSTDOCFLAGS = "-C link-self-contained=-linker";
-      };
-      pkgs = lib.optional shouldFix pkgs.llvmPackages.bintools;
-    };
 in
 rec {
   mkApp =
@@ -124,8 +109,7 @@ rec {
     in
     {
       nativeBuildInputs =
-        rust190_fix.pkgs
-        ++ (nativeBuildInputs pkgs)
+        (nativeBuildInputs pkgs)
         ++ (lib.optional readme pkgs.cargo-readme)
         ++ (lib.optional (bindgen != null) pkgs.rust-cbindgen);
       buildInputs = buildInputs pkgs;
@@ -148,8 +132,6 @@ rec {
           ))
         );
       };
-
-      env = rust190_fix.env;
     }
     // (lib.optionalAttrs mega {
       CARGO_PROFILE = "mega";
