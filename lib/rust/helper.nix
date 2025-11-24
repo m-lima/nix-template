@@ -52,7 +52,7 @@ system: root:
 
   # general
   readme ? false, # If cargo-readme should be used to check the README.md file
-  bindgen ? null, # Path to the generated bindgen file, if it should be checked
+  bindgen ? false, # If cbindgen should be run
   overrides ? { },
 }:
 let
@@ -111,7 +111,7 @@ rec {
       nativeBuildInputs =
         (nativeBuildInputs pkgs)
         ++ (lib.optional readme pkgs.cargo-readme)
-        ++ (lib.optional (bindgen != null) pkgs.rust-cbindgen);
+        ++ (lib.optional bindgen pkgs.rust-cbindgen);
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -156,7 +156,20 @@ rec {
       tryOverride "cargoArtifacts" (craneLib.buildDepsOnly commonArgs);
 
   mainArtifact = tryOverride "mainArtifact" (
-    craneLib.buildPackage (mainArgs // { inherit cargoArtifacts; })
+    craneLib.buildPackage (
+      mainArgs
+      // {
+        inherit cargoArtifacts;
+      }
+      // (lib.optionalAttrs bindgen {
+        postInstall = ''
+          mkdir -p $out/include
+          cbindgen . --output $out/include/${
+            (craneLib.crateNameFromCargoToml { cargoToml = "${root}/Cargo.toml"; }).pname
+          }.h
+        '';
+      })
+    )
   );
 
   treefmt = tryOverride "treefmt" {
@@ -338,15 +351,6 @@ rec {
         // {
           cargoArtifacts = checkCargoArtifacts;
           buildPhaseCargoCommand = "diff README.md <(cargo readme)";
-        }
-      );
-    })
-    // (lib.optionalAttrs (builtins.isPath bindgen) {
-      bindgen = craneLib.mkCargoDerivation (
-        checkCommonArgs
-        // {
-          cargoArtifacts = checkCargoArtifacts;
-          buildPhaseCargoCommand = "diff ${bindgen} <(cbindgen .)";
         }
       );
     })
