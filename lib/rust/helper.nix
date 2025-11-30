@@ -111,7 +111,7 @@ rec {
       nativeBuildInputs =
         (nativeBuildInputs pkgs)
         ++ (lib.optional readme pkgs.cargo-readme)
-        ++ (lib.optional bindgen pkgs.rust-cbindgen);
+        ++ (lib.optional (builtins.isPath bindgen || bindgen) pkgs.rust-cbindgen);
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -161,7 +161,7 @@ rec {
       // {
         inherit cargoArtifacts;
       }
-      // (lib.optionalAttrs bindgen {
+      // (lib.optionalAttrs (builtins.isPath bindgen || bindgen) {
         postInstall = ''
           mkdir -p $out/include
           cbindgen . --output $out/include/${
@@ -351,6 +351,15 @@ rec {
         // {
           cargoArtifacts = checkCargoArtifacts;
           buildPhaseCargoCommand = "diff README.md <(cargo readme)";
+        }
+      );
+    })
+    // (lib.optionalAttrs (builtins.isPath bindgen) {
+      bindgen = craneLib.mkCargoDerivation (
+        checkCommonArgs
+        // {
+          cargoArtifacts = checkCargoArtifacts;
+          buildPhaseCargoCommand = "diff ${bindgen} <(cbindgen .)";
         }
       );
     })
