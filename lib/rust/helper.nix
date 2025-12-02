@@ -173,7 +173,7 @@ rec {
   );
 
   treefmt = tryOverride "treefmt" {
-    projectRootFile = "${root}/Cargo.toml";
+    projectRootFile = "flake.nix";
     programs = override formatters (
       {
         nixfmt.enable = true;
