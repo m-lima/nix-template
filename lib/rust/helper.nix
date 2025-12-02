@@ -96,7 +96,7 @@ rec {
     in
     (crane.mkLib pkgs).overrideToolchain (
       if builtins.length resolvedToolchains == 0 then
-        fenixPkgs.stable.toolchain
+        fenixPkgs.stable.defaultToolchain
       else if builtins.length resolvedToolchains < 2 then
         builtins.head resolvedToolchains
       else
