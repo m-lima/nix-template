@@ -376,6 +376,11 @@ rec {
       packages =
         with pkgs;
         [
+          (pkgs.writeShellScriptBin "cargo-docsrs" ''
+            PATH="${
+              fenix.packages.${system}.minimal.toolchain
+            }/bin:$PATH" RUSTDOCFLAGS='--cfg docsrs' cargo doc --all-features --no-deps
+          '')
           cargo-hack
           cargo-outdated
           cargoAll
