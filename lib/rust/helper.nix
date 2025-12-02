@@ -47,6 +47,7 @@ system: root:
   # treeFmt
   formatters ? { },
   fmtSettings ? { },
+  fmtExcludes ? [ ],
 
   hack ? false, # If cargo-all with cargo-hack should be used
 
@@ -192,20 +193,22 @@ rec {
       {
         on-unmatched = "warn";
         excludes = [
+          "**/.direnv/*"
+          "**/.envrc"
+          "**/.gitignore"
           "*.lock"
           ".direnv/*"
           ".envrc"
           ".gitignore"
+          "LICENSE"
           "result*/*"
           "target/*"
-          "LICENSE"
-        ];
+        ]
+        ++ fmtExcludes
+        ++ (lib.optional readme "README.md");
       }
       // (lib.optionalAttrs readme {
         formatter = {
-          mdformat.excludes = [
-            "README.md"
-          ];
           mdformat.includes = [
             "README.tpl"
           ];
