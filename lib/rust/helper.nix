@@ -52,6 +52,7 @@ system: root:
   hack ? false, # If cargo-all with cargo-hack should be used
 
   # general
+  systemLinker ? false, # Useful when dynamic linking is needed
   readme ? false, # If cargo-readme should be used to check the README.md file
   bindgen ? false, # If cbindgen should be run
   overrides ? { },
@@ -112,7 +113,8 @@ rec {
       nativeBuildInputs =
         (nativeBuildInputs pkgs)
         ++ (lib.optional readme pkgs.cargo-readme)
-        ++ (lib.optional (builtins.isPath bindgen || bindgen) pkgs.rust-cbindgen);
+        ++ (lib.optional (builtins.isPath bindgen || bindgen) pkgs.rust-cbindgen)
+        ++ (lib.optional systemLinker pkgs.llvmPackages.bintools);
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -132,6 +134,10 @@ rec {
             ]
           ))
         );
+      };
+      env = lib.optionalAttrs systemLinker {
+        RUSTFLAGS = "-C link-self-contained=-linker";
+        RUSTDOCFLAGS = "-C link-self-contained=-linker";
       };
     }
     // (lib.optionalAttrs mega {
