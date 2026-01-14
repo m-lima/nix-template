@@ -42,7 +42,7 @@ flake-utils.lib.eachDefaultSystem (
           ];
         };
       }).config.build;
-    python = if builtins.isNull overridePython then pkgs.python312 else overridePython;
+    python = if builtins.isNull overridePython then pkgs.python3 else overridePython;
     pyPkgs = if builtins.isNull packages then python else python.withPackages packages;
   in
   {

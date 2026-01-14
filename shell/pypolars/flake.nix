@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -18,10 +18,11 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            python312
-            python312Packages.ipython
-            python312Packages.polars
-            python312Packages.altair
+            (python3.withPackages (p: [
+              p.ipython
+              p.polars
+              p.altair
+            ]))
           ];
         };
       }

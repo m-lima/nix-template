@@ -55,6 +55,7 @@ system: root:
   systemLinker ? false, # Useful when dynamic linking is needed
   readme ? false, # If cargo-readme should be used to check the README.md file
   bindgen ? false, # If cbindgen should be run
+  wasm ? false, # If this should generate wasm-bindgen output
   overrides ? { },
 }:
 let
@@ -140,10 +141,13 @@ rec {
         RUSTDOCFLAGS = "-C link-self-contained=-linker";
       };
     }
-    // (lib.optionalAttrs mega {
-      CARGO_PROFILE = "mega";
-      CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-    })
+    // (
+      lib.optionalAttrs mega
+      && !wasm {
+        CARGO_PROFILE = "mega";
+        CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+      }
+    )
   );
 
   mainArgs = tryOverride "mainArgs" (
@@ -176,6 +180,25 @@ rec {
           }.h
         '';
       })
+    )
+  );
+
+  wasmArgs = tryOverride "wasmArgs" (
+    builtins.removeAttrs mainArgs [
+      "env"
+      "CARGO_PROFILE"
+      "CARGO_BUILD_RUSTFLAGS"
+    ]
+  );
+
+  wasmArtifact = tryOverride "wasmArtifact" (
+    craneLib.mkCargoDerivation (
+      wasmArgs
+      // {
+        inherit cargoArtifacts;
+        buildPhaseCargoCommand = "wasm-bindgen target/wasm32-unknown-unknown/release/passer.wasm --out-dir pkg";
+        installPhaseCommand = "cp -r pkg $out";
+      }
     )
   );
 
@@ -405,5 +428,8 @@ rec {
   }
   // (lib.optionalAttrs binary {
     apps.default = mkApp { drv = mainArtifact; };
+  })
+  // (lib.optionalAttrs wasm {
+    packages.wasm = craneLib.buildPackage (mainArgs // { inherit cargoArtifacts; });
   });
 }

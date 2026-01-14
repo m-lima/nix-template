@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
@@ -17,10 +17,10 @@
       ...
     }@inputs:
     helper.lib.python.helper inputs {
-      buildInputs = pkgs: [
-        pkgs.python312Packages.ipython
-        pkgs.python312Packages.polars
-        pkgs.python312Packages.altair
+      packages = p: [
+        p.ipython
+        p.polars
+        p.altair
       ];
     };
 }
