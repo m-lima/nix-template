@@ -141,13 +141,10 @@ rec {
         RUSTDOCFLAGS = "-C link-self-contained=-linker";
       };
     }
-    // (
-      lib.optionalAttrs mega
-      && !wasm {
-        CARGO_PROFILE = "mega";
-        CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
-      }
-    )
+    // (lib.optionalAttrs (mega && !wasm) {
+      CARGO_PROFILE = "mega";
+      CARGO_BUILD_RUSTFLAGS = "-C target-cpu=native -C prefer-dynamic=no";
+    })
   );
 
   mainArgs = tryOverride "mainArgs" (
@@ -196,7 +193,9 @@ rec {
       wasmArgs
       // {
         inherit cargoArtifacts;
-        buildPhaseCargoCommand = "wasm-bindgen target/wasm32-unknown-unknown/release/passer.wasm --out-dir pkg";
+        buildPhaseCargoCommand = "wasm-bindgen target/wasm32-unknown-unknown/release/${
+          (craneLib.crateNameFromCargoToml { cargoToml = "${root}/Cargo.toml"; }).pname
+        }.wasm --out-dir pkg";
         installPhaseCommand = "cp -r pkg $out";
       }
     )
