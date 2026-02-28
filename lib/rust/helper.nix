@@ -31,6 +31,7 @@ system: root:
 
   # mainArgs
   lockRandomSeed ? false, # Useful when using `cc`
+  package ? null, # Useful for workspaces
 
   # devShell
   devPackages ? pkgs: [ ],
@@ -149,6 +150,9 @@ rec {
 
   mainArgs = tryOverride "mainArgs" (
     commonArgs
+    // (lib.optionalAttrs (builtins.isString package) {
+      cargoExtraArgs = "-p ${package}";
+    })
     // (lib.optionalAttrs lockRandomSeed {
       NIX_OUTPATH_USED_AS_RANDOM_SEED = "0123456789";
     })
