@@ -125,7 +125,7 @@ rec {
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
-        "--locked ${prepareFeatures features} ${cargoExtraArgs}"
+        "--locked ${prepareFeatures features} ${cargoExtraArgs} "
         + (lib.optionalString noDefaultFeatures "--no-default-features");
       src = lib.fileset.toSource {
         inherit root;
