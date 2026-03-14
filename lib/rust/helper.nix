@@ -81,6 +81,9 @@ let
   tryOverride =
     name: default:
     if builtins.hasAttr name overrides then override overrides.${name} default else default;
+
+  # TODO: If mac ever starts supporting link-self-contained, this needs to be removed
+  effectiveSystemLinker = systemLinker && pkgs.stdenv.isLinux;
 in
 rec {
   mkApp =
@@ -118,7 +121,7 @@ rec {
         (nativeBuildInputs pkgs)
         ++ (lib.optional readme pkgs.cargo-readme)
         ++ (lib.optional (builtins.isPath bindgen || bindgen) pkgs.rust-cbindgen)
-        ++ (lib.optional systemLinker pkgs.llvmPackages.bintools);
+        ++ (lib.optional effectiveSystemLinker pkgs.llvmPackages.bintools);
       buildInputs = buildInputs pkgs;
       strictDeps = true;
       cargoExtraArgs =
@@ -139,7 +142,7 @@ rec {
           ))
         );
       };
-      env = lib.optionalAttrs systemLinker {
+      env = lib.optionalAttrs effectiveSystemLinker {
         RUSTFLAGS = "-C link-self-contained=-linker";
         RUSTDOCFLAGS = "-C link-self-contained=-linker";
       };
