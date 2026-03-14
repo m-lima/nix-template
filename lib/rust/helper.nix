@@ -73,8 +73,10 @@ let
       overrider default
     else if builtins.isList default then
       default ++ overrider
+    else if builtins.isAttrs default then
+      default // overrider
     else
-      default // overrider;
+      overrider;
 
   tryOverride =
     name: default:
