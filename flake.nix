@@ -3,6 +3,10 @@
     { ... }:
     {
       templates = {
+        go = {
+          description = "Go scaffold";
+          path = ./template/go;
+        };
         python = {
           description = "Python scaffold";
           path = ./template/python;
@@ -26,6 +30,7 @@
       };
 
       lib = {
+        go.helper = import ./lib/go/helper.nix;
         python.helper = import ./lib/python/helper.nix;
         rust.helper = import ./lib/rust/helper.nix;
       };
