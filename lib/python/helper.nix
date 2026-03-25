@@ -47,7 +47,10 @@ flake-utils.lib.eachDefaultSystem (
   {
     formatter = treefmt.wrapper;
     devShells.default = pkgs.mkShell {
-      packages = [ pyPkgs ];
+      packages = [
+        pyPkgs
+        pkgs.pyright
+      ];
       buildInputs = buildInputs pkgs;
       nativeBuildInputs = nativeBuildInputs pkgs;
 
@@ -56,7 +59,7 @@ flake-utils.lib.eachDefaultSystem (
         VENV=.venv
 
         if test ! -d $VENV; then
-          python3 -m venv $VENV
+          "${pythonPkg}/bin/python" -m venv $VENV
         fi
         source ./$VENV/bin/activate
         export PYTHONPATH=$(pwd)/$VENV/${pythonPkg.sitePackages}/:$PYTHONPATH
