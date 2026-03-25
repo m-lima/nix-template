@@ -61,26 +61,14 @@ system: root:
 }:
 let
   pkgs = nixpkgs.legacyPackages.${system};
+  util = import ../util.nix;
   inherit (pkgs) lib;
+  inherit (util) override;
+  tryOverride = util.tryOverride overrides;
 
   listFeatures =
     arg: list:
     lib.optionalString (builtins.length list > 0) "${arg} ${builtins.concatStringsSep "," list}";
-
-  override =
-    overrider: default:
-    if builtins.isFunction overrider then
-      overrider default
-    else if builtins.isList default then
-      default ++ overrider
-    else if builtins.isAttrs default then
-      default // overrider
-    else
-      overrider;
-
-  tryOverride =
-    name: default:
-    if builtins.hasAttr name overrides then override overrides.${name} default else default;
 
   # TODO: If mac ever starts supporting link-self-contained, this needs to be removed
   effectiveSystemLinker = systemLinker && pkgs.stdenv.isLinux;
@@ -227,23 +215,7 @@ rec {
       })
     );
     settings = override fmtSettings (
-      {
-        on-unmatched = "warn";
-        excludes = [
-          "**/.direnv/*"
-          "**/.envrc"
-          "**/.gitignore"
-          "*.lock"
-          ".direnv/*"
-          ".envrc"
-          ".gitignore"
-          "LICENSE"
-          "result*/*"
-          "target/*"
-        ]
-        ++ fmtExcludes
-        ++ (lib.optional readme "README.md");
-      }
+      util.fmtSettings ([ "target/*" ] ++ (lib.optional readme "README.md")) fmtExcludes
       // (lib.optionalAttrs readme {
         formatter = {
           mdformat.includes = [

@@ -5,51 +5,51 @@
   ...
 }:
 {
-  fmts ? [ ],
-  buildInputs ? _: [ ],
-  packages ? null,
-  overridePython ? null,
+  python ? null,
+  pythonPackages ? null,
+
+  # Dependencies
+  buildInputs ? pkgs: [ ],
+  nativeBuildInputs ? pkgs: [ ],
+  devPackages ? pkgs: [ ],
+
+  # treeFmt
+  formatters ? { },
+  fmtSettings ? { },
+  fmtExcludes ? [ ],
+
+  # General
+  overrides ? { },
 }:
 flake-utils.lib.eachDefaultSystem (
   system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
-    inherit (pkgs) lib;
-    treefmt =
-      (treefmt-nix.lib.evalModule pkgs {
-        projectRootFile = "flake.nix";
-        programs = {
-          nixfmt.enable = true;
-          mypy.enable = true;
-        }
-        // (lib.listToAttrs (
-          map (x: {
-            name = x;
-            value = {
-              enable = true;
-            };
-          }) fmts
-        ));
-        settings = {
-          excludes = [
-            "*.lock"
-            ".direnv/*"
-            ".envrc"
-            ".gitignore"
-            ".mypy_cache/*"
-            "LICENSE"
-            "result*/*"
-          ];
-        };
-      }).config.build;
-    python = if builtins.isNull overridePython then pkgs.python3 else overridePython;
-    pyPkgs = if builtins.isNull packages then python else python.withPackages packages;
+    util = import ../util.nix;
+    inherit (util) override;
+    tryOverride = util.tryOverride overrides;
+
+    fmtConfig = tryOverride "treefmt" {
+      projectRootFile = "flake.nix";
+      programs = override formatters {
+        nixfmt.enable = true;
+        mypy.enable = true;
+      };
+      settings = override fmtSettings (util.fmtSettings [ ".mypy_cache/*" ] fmtExcludes);
+    };
+
+    treefmt = (treefmt-nix.lib.evalModule pkgs fmtConfig).config.build;
+
+    pythonPkg = override python pkgs.python3;
+    pyPkgs =
+      if builtins.isNull pythonPackages then pythonPkg else pythonPkg.withPackages pythonPackages;
   in
   {
     formatter = treefmt.wrapper;
     devShells.default = pkgs.mkShell {
       packages = [ pyPkgs ];
       buildInputs = buildInputs pkgs;
+      nativeBuildInputs = nativeBuildInputs pkgs;
 
       shellHook = ''
         SOURCE_DATE_EPOCH=$(date +%s)
@@ -59,12 +59,12 @@ flake-utils.lib.eachDefaultSystem (
           python3 -m venv $VENV
         fi
         source ./$VENV/bin/activate
-        export PYTHONPATH=$(pwd)/$VENV/${python.sitePackages}/:$PYTHONPATH
+        export PYTHONPATH=$(pwd)/$VENV/${pythonPkg.sitePackages}/:$PYTHONPATH
         pip install -r requirements.txt
       '';
 
       postShellHook = ''
-        ln -sf ${python.sitePackages}/* ./.venv/${python.sitePackages}
+        ln -sf ${pythonPkg.sitePackages}/* ./.venv/${pythonPkg.sitePackages}
       '';
     };
   }
