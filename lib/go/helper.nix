@@ -83,10 +83,6 @@ in
     buildInputs = [
       go2nix.gomod2nix
       pkgs.go
-      pkgs.gopls
-      pkgs.gofumpt
-      pkgs.golangci-lint
-      pkgs.golangci-lint-langserver
     ];
   };
 }
