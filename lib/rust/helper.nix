@@ -18,7 +18,11 @@
 system: root:
 {
   # cranelib
-  toolchains ? fenixPkgs: [ ],
+  baseToolchain ? fenixPkgs: {
+    main = fenixPkgs.stable.defaultToolchain;
+    dev = fenixPkgs.stable.toolchain;
+  },
+  extraToolchains ? fenixPkgs: [ ],
 
   # commonArgs
   features ? [ ],
@@ -72,6 +76,16 @@ let
 
   # TODO: If mac ever starts supporting link-self-contained, this needs to be removed
   effectiveSystemLinker = systemLinker && pkgs.stdenv.isLinux;
+
+  toolchains =
+    dev:
+    let
+      fenixPkgs = fenix.packages.${system};
+      appliedBase = baseToolchain fenixPkgs;
+      appliedExtra = extraToolchains fenixPkgs;
+      base = if dev then appliedBase.dev else appliedBase.main;
+    in
+    if builtins.length appliedExtra > 0 then fenixPkgs.combine ([ base ] ++ appliedExtra) else base;
 in
 rec {
   mkApp =
@@ -85,20 +99,8 @@ rec {
       program = "${drv}${exePath}";
     };
 
-  craneLib = tryOverride "craneLib" (
-    let
-      fenixPkgs = fenix.packages.${system};
-      resolvedToolchains = toolchains fenixPkgs;
-    in
-    (crane.mkLib pkgs).overrideToolchain (
-      if builtins.length resolvedToolchains == 0 then
-        fenixPkgs.stable.defaultToolchain
-      else if builtins.length resolvedToolchains < 2 then
-        builtins.head resolvedToolchains
-      else
-        fenixPkgs.combine resolvedToolchains
-    )
-  );
+  craneLib = tryOverride "craneLib" (crane.mkLib pkgs).overrideToolchain (toolchains false);
+  devCraneLib = tryOverride "devCraneLib" (crane.mkLib pkgs).overrideToolchain (toolchains true);
 
   commonArgs = tryOverride "commonArgs" (
     let
@@ -404,7 +406,7 @@ rec {
     packages.default = mainArtifact;
     checks = checks;
     formatter = formatter;
-    devShells.default = craneLib.devShell devShell;
+    devShells.default = devCraneLib.devShell devShell;
   }
   // (lib.optionalAttrs binary {
     apps.default = mkApp { drv = mainArtifact; };
