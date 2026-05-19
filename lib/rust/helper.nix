@@ -39,6 +39,7 @@ system: root:
 
   # devShell
   devPackages ? pkgs: [ ],
+  codelldb ? false,
 
   # cargoArtifact
   monolithic ? false, # Useful when cross compiling
@@ -396,7 +397,15 @@ rec {
           cargo-outdated
           cargoAll
         ]
-        ++ (devPackages pkgs);
+        ++ (devPackages pkgs)
+        ++ (lib.optional codelldb (
+          pkgs.writeShellScriptBin "codelldb" ''
+            exec ${pkgs.vscode-extensions.vadimcn.vscode-lldb.adapter}/bin/codelldb $@
+          ''
+        ));
+      env = lib.optionalAttrs (codelldb && pkgs.stdenv.isDarwin) {
+        LLDB_DEBUGSERVER_PATH = "/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver";
+      };
     }
   );
 
